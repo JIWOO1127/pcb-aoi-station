@@ -1,4 +1,7 @@
 <Solution>
+  <Folder Name="/솔루션 항목/">
+    <File Path="README.md" />
+  </Folder>
   <Project Path="Inspection.Contracts/Inspection.Contracts.csproj" />
   <Project Path="Inspection.Hmi/Inspection.Hmi.csproj" />
   <Project Path="Inspection.Station/Inspection.Station.csproj" />
