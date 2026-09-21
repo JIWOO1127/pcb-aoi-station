@@ -1,0 +1,5 @@
+<Solution>
+  <Project Path="Inspection.Contracts/Inspection.Contracts.csproj" />
+  <Project Path="Inspection.Hmi/Inspection.Hmi.csproj" />
+  <Project Path="Inspection.Station/Inspection.Station.csproj" />
+</Solution>

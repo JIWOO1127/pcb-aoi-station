@@ -1,0 +1,6 @@
+@Inspection.Station_HostAddress = http://localhost:5215
+
+GET {{Inspection.Station_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
