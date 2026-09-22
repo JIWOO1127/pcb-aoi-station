@@ -13,7 +13,7 @@
 {
   "parts": [
     {
-      "pinhole": "J14",
+      "pinhole": "J9",
       "class": "resistor_220",
       "confidence": 0.97
     }
@@ -23,7 +23,7 @@
 
 | 필드 | 설명 |
 |---|---|
-| `pinhole` | 부품이 꽂힌 브레드보드 핀홀 라벨 (예: `"J14"`) |
+| `pinhole` | 부품이 꽂힌 핀홀 라벨. "행글자 + 열숫자" (예: `"J9"`). 행 A~U(위→아래), 열 0~13(왼쪽→오른쪽). 그리드 정의는 [inference/app/pinhole_grid.py](../inference/app/pinhole_grid.py) 참고 |
 | `class` | 탐지된 부품 종류 |
 | `confidence` | 탐지 신뢰도 (0~1) |
 

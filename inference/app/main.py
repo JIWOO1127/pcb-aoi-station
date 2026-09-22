@@ -13,13 +13,16 @@ from typing import List
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
+from board import DetectedBox, all_holes, match_holes_to_boxes
+from calibration import GridCalibration
+
 app = FastAPI(title="PCB AOI 추론 서비스")
 
 
 class PartResult(BaseModel):
     model_config = ConfigDict(populate_by_name=True)
 
-    pinhole: str  # 브레드보드 핀홀 라벨 (예: "J14")
+    pinhole: str  # 핀홀 라벨 (예: "J9")
     part_class: str = Field(alias="class")  # 탐지된 부품 종류
     confidence: float  # 0~1
 
@@ -46,10 +49,44 @@ async def infer(image: UploadFile = File(...)) -> InferResponse:
 
 
 def run_inference(image_bytes: bytes) -> List[PartResult]:
-    """YOLO로 부품을 탐지하고, 픽셀 좌표를 핀홀 라벨로 변환한다.
+    """이미지 한 장을 받아, 핀홀별 장착 부품을 반환한다.
 
-    TODO:
-    - YOLO 모델 로딩 및 추론
-    - 탐지된 박스(픽셀 좌표) -> 브레드보드 핀홀 라벨 변환
+    단계:
+    1. 보드 네 모서리 핀홀(A0, A13, U0, U13)의 픽셀 좌표를 찾는다.        [TODO]
+    2. YOLO로 부품을 탐지해 박스(픽셀 좌표)를 얻는다.                    [TODO]
+    3. 핀홀 282개의 기대 픽셀 위치를 계산하고, 박스와 대조해 어느 핀홀이
+       가려져 있는지(=장착돼 있는지) 구한다. (board.py, calibration.py로 구현됨)
+    4. 가려진(=장착된) 핀홀만 골라 응답으로 만든다.
+    """
+    corners = find_board_corners(image_bytes)  # TODO
+    boxes = detect_parts(image_bytes)  # TODO
+
+    calibration = GridCalibration.from_corners(**corners)
+    holes = all_holes(calibration)
+    match_holes_to_boxes(holes, boxes)
+
+    return [
+        PartResult(pinhole=hole.label, part_class=hole.part_class, confidence=hole.confidence)
+        for hole in holes
+        if hole.covered
+    ]
+
+
+def find_board_corners(image_bytes: bytes) -> dict:
+    """이미지에서 보드 네 모서리 핀홀(A0, A13, U0, U13)의 픽셀 좌표를 찾는다.
+
+    TODO: 실제 촬영 이미지로 확인 필요 — 모서리에 별도 기준 마크가 있는지,
+    아니면 핀홀 자체를 검출해서 가장자리 4개를 골라야 하는지 등.
+
+    반환값은 GridCalibration.from_corners()에 그대로 넣을 수 있는 형태:
+    {"top_left": (x, y), "top_right": (x, y), "bottom_left": (x, y), "bottom_right": (x, y)}
+    """
+    raise NotImplementedError("보드 모서리 핀홀 검출 필요")
+
+
+def detect_parts(image_bytes: bytes) -> List[DetectedBox]:
+    """YOLO 모델로 부품을 탐지해 박스 목록을 반환한다.
+
+    TODO: YOLO 모델 로딩 및 추론.
     """
     raise NotImplementedError("YOLO 모델 연동 필요")
