@@ -12,12 +12,13 @@ API 계약(요청/응답 형식)은 [docs/api-contract.md](../docs/api-contract.
 
 ## 처리 흐름
 
-이미지 한 장이 들어와서 `{pinhole, class, confidence}` 목록이 나가기까지, 4단계를 거친다.
+이미지 한 장이 들어와서 `{pinhole, class, confidence}` 목록이 나가기까지, 5단계를 거친다.
 
 ```mermaid
 flowchart TD
-    IMG[이미지 JPEG] --> CORNERS
-    IMG --> YOLO
+    IMG[이미지 JPEG] --> DECODE[0. 디코딩 + 고정 ROI 크롭<br/>roi.crop_to_roi<br/>카메라·지그 고정 -&gt; 보드 대략 위치는 고정]
+    DECODE --> CORNERS
+    DECODE --> YOLO
 
     subgraph S1["1. 보드 모서리 찾기 (TODO)"]
         CORNERS[네 모서리 핀홀<br/>A0·A13·U0·U13의<br/>픽셀 좌표 검출]
@@ -35,23 +36,26 @@ flowchart TD
 ```
 
 **왜 이런 순서인가**
-- 촬영마다 보드가 이미지 안에서 조금씩 다르게 나온다(위치·기울기·크기가 미묘하게 다름). 그래서 핀홀 픽셀 위치를 고정값으로 하드코딩할 수 없고, **이미지마다 다시 계산**해야 한다.
-- 대신 "보드 전체가 항상 이미지 안에 다 보인다"는 게 보장되어 있으므로, 매번 네 모서리 핀홀(A0·A13·U0·U13)의 픽셀 좌표만 찾으면, 나머지 278개 핀홀 위치는 계산(호모그래피)으로 구할 수 있다.
+- 카메라·촬영 지그가 고정돼 있어서, 보드가 이미지 안에서 대략 어디쯤 나오는지는 항상 같다. 그래서 원본 이미지를 그대로 쓰지 않고, 먼저 고정된 사각형(ROI)으로 크롭해서 보드가 있는 부분만 남긴다.
+- 다만 크롭 후에도 보드 위치·기울기·크기가 미세하게(픽셀 단위로) 조금씩 다르다. 그래서 핀홀 픽셀 위치를 고정값으로 완전히 하드코딩할 수는 없고, **크롭된 이미지마다 다시 계산**해야 한다.
+- 대신 "보드 전체가 항상 크롭 영역 안에 다 들어온다"는 게 보장되어 있으므로, 매번 네 모서리 핀홀(A0·A13·U0·U13)의 픽셀 좌표만 찾으면, 나머지 278개 핀홀 위치는 계산(호모그래피)으로 구할 수 있다.
 - "박스 중심과 가장 가까운 핀홀 하나"를 고르는 대신, 반대로 "핀홀마다 어떤 박스 안에 들어가는지"를 본다. 이러면 저항처럼 다리(핀) 두 개짜리 부품이 핀홀 두 개에 걸쳐 있어도 둘 다 자연스럽게 잡힌다.
 
 ## 파일 구성
 
 | 파일 | 역할 | 상태 |
 |---|---|---|
-| [app/main.py](app/main.py) | FastAPI 앱. `/health`, `/infer` 엔드포인트 | 뼈대 완성, TODO 2곳 남음 |
+| [app/main.py](app/main.py) | FastAPI 앱. `/health`, `/infer` 엔드포인트 | 뼈대 완성, TODO 3곳 남음 |
+| [app/roi.py](app/roi.py) | 고정 카메라·지그 기준, 원본 이미지에서 보드가 있는 대략적 영역(ROI)을 크롭 | ROI 좌표 실측 전 (TODO) |
 | [app/pinhole_grid.py](app/pinhole_grid.py) | 핀홀 282개의 그리드 정의(행 A~U, 열 0~13)와 라벨 변환 | 완성 |
 | [app/calibration.py](app/calibration.py) | 네 모서리 핀홀 픽셀 좌표 → 호모그래피 → 픽셀 ↔ 그리드 좌표 변환 | 완성 |
 | [app/board.py](app/board.py) | 핀홀 282개를 이미지 속 위치·장착 여부와 함께 구조화, YOLO 박스와 대조 | 완성 |
-| `requirements.txt` | fastapi, uvicorn, python-multipart, pydantic, numpy | — |
+| `requirements.txt` | fastapi, uvicorn, python-multipart, pydantic, numpy, opencv-python-headless | — |
 
 ## 아직 안 된 것 (TODO)
 
-- **`find_board_corners`** ([app/main.py](app/main.py)): 이미지에서 네 모서리 핀홀(A0·A13·U0·U13)의 픽셀 좌표를 실제로 찾는 부분. 기준 마크가 따로 있는지, 핀홀 자체를 이미지 처리로 찾아야 하는지는 실제 촬영 이미지가 있어야 확인 가능.
+- **`roi.ROI`** ([app/roi.py](app/roi.py)): 크롭할 고정 사각형 좌표. 실제 카메라로 촬영해야 값을 채울 수 있음.
+- **`find_board_corners`** ([app/main.py](app/main.py)): 크롭된 이미지에서 네 모서리 핀홀(A0·A13·U0·U13)의 픽셀 좌표를 실제로 찾는 부분. 기준 마크가 따로 있는지, 핀홀 자체를 이미지 처리로 찾아야 하는지는 실제 촬영 이미지가 있어야 확인 가능.
 - **`detect_parts`** ([app/main.py](app/main.py)): YOLO 모델 로딩 및 추론 연동.
 
 세션별 상세 진행 기록은 [WORKLOG.md](WORKLOG.md) 참고.

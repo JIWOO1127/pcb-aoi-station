@@ -41,8 +41,13 @@
   - `DetectedBox`(YOLO 박스, 픽셀 사각형) + `match_holes_to_boxes(holes, boxes)`: 각 홀의 기대 픽셀 위치가 어떤 박스 안에 들어가면 그 홀을 "가려짐"으로 표시. 박스 중심 하나로 핀홀 하나만 고르는 방식과 달리, 부품 하나가 다리 여러 개(핀홀 여러 개)에 걸치는 경우도 자연스럽게 처리됨
   - 가짜 좌표로 end-to-end 테스트 완료: 282개 생성, 모서리 핀홀 픽셀이 지정값과 정확히 일치, 가짜 박스로 특정 홀 하나만 정확히 "covered" 처리되는 것 확인
 - [app/main.py](app/main.py)의 `run_inference`를 실제 파이프라인으로 연결: 모서리 찾기(TODO) → YOLO 탐지(TODO) → `GridCalibration` → `all_holes` → `match_holes_to_boxes` → 가려진 홀만 `PartResult` 목록으로 반환
+- **카메라·지그 고정 확인**: 사용자 확인 — "들어오는 이미지는 고정" = 카메라·지그가 고정돼 있어서 해상도·프레임이 항상 동일함. 그래서 보드가 대략 나오는 영역도 고정된 사각형(ROI)으로 미리 크롭 가능. (다만 이 크롭은 "대강 보드 영역만 남기기"용이고, 홀 픽셀 위치가 미세하게 달라지는 부분은 여전히 `calibration.py`가 크롭된 이미지 안에서 보정)
+  - [app/roi.py](app/roi.py) 작성: `ROI` 상수(x1,y1,x2,y2) + `crop_to_roi(image)`. **ROI 좌표는 아직 실측 전이라 `None`** — 실제 촬영 이미지 확보되면 채워야 함
+  - [app/main.py](app/main.py): 이미지 디코딩(`cv2.imdecode`) → `crop_to_roi` → `find_board_corners`/`detect_parts`(둘 다 크롭된 이미지 기준 좌표로 동작하도록 시그니처 변경) 순으로 파이프라인 앞단에 크롭 단계 추가
+  - `requirements.txt`에 `opencv-python-headless` 추가 (이미지 디코딩·크롭·향후 CV 작업용)
 - 다음 할 일:
-  - `find_board_corners`: 원본 이미지에서 네 모서리 핀홀(A0/A13/U0/U13)의 픽셀 좌표를 실제로 찾는 로직 (기준 마크가 있는지, 핀홀 자체를 검출해야 하는지 실제 촬영 이미지로 확인 필요)
+  - `roi.ROI`: 실제 카메라로 촬영 후 크롭 좌표 채우기
+  - `find_board_corners`: 크롭된 이미지에서 네 모서리 핀홀(A0/A13/U0/U13)의 픽셀 좌표를 실제로 찾는 로직 (기준 마크가 있는지, 핀홀 자체를 검출해야 하는지 실제 촬영 이미지로 확인 필요)
   - `detect_parts`: YOLO 모델 연동
 
 ### 머신비전 구성 개념 정리
@@ -56,3 +61,9 @@
 - **PASS/FAIL 판정**: 딥러닝도 이 서비스도 아니고, C# 스테이션의 규칙 엔진이 담당
 
 즉 "브레드보드 구조화" 전체가 머신비전 작업이긴 하지만, 그 안에서도 딥러닝(부품 인식)과 기하학/OpenCV(좌표 변환)와 순수 후처리(구조화)가 나뉘어 있다. 나중에 모델이 핀홀·단자 키포인트까지 직접 검출하도록 학습시키면 그 부분도 딥러닝이 되겠지만, 검출 좌표를 핀홀 이름으로 바꾸는 마지막 단계는 그래도 규칙 기반으로 남을 수 있다.
+
+### 개발 환경 확인
+
+- VS Code/Pylance에서 `Import "fastapi" could not be resolved` 경고 발생.
+- `pcb-aoi` Conda 환경(`C:\miniforge4\envs\pcb-aoi\python.exe`, Python 3.11.16)은 존재하지만 `fastapi` 패키지가 아직 설치되지 않은 것을 확인함.
+- `inference/requirements.txt`를 해당 환경에 설치하고 VS Code 인터프리터를 `pcb-aoi`로 선택해야 함.
