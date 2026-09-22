@@ -1,0 +1,467 @@
+[
+  {
+    "_note": "정상",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Pass",
+    "defectCount": 0,
+    "parts": [
+      {
+        "partId": "R1",
+        "expectedClass": "resistance",
+        "expectedHole": "A0",
+        "detectedClass": "resistance",
+        "detectedHole": "A0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "R2",
+        "expectedClass": "resistance",
+        "expectedHole": "A2",
+        "detectedClass": "resistance",
+        "detectedHole": "A2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "U1",
+        "expectedClass": "ic_chip",
+        "expectedHole": "C5",
+        "detectedClass": "ic_chip",
+        "detectedHole": "C5",
+        "pinSide": "up",
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "LED1",
+        "expectedClass": "led",
+        "expectedHole": "A8",
+        "detectedClass": "led",
+        "detectedHole": "A8",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W1",
+        "expectedClass": "red_wire",
+        "expectedHole": "E0",
+        "detectedClass": "red_wire",
+        "detectedHole": "E0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W2",
+        "expectedClass": "red_wire",
+        "expectedHole": "E2",
+        "detectedClass": "red_wire",
+        "detectedHole": "E2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W3",
+        "expectedClass": "black_wire",
+        "expectedHole": "G0",
+        "detectedClass": "black_wire",
+        "detectedHole": "G0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W4",
+        "expectedClass": "white_wire",
+        "expectedHole": "G2",
+        "detectedClass": "white_wire",
+        "detectedHole": "G2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      }
+    ],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": null
+  },
+  {
+    "_note": "누락: LED1 없음",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Fail",
+    "defectCount": 1,
+    "parts": [
+      {
+        "partId": "R1",
+        "expectedClass": "resistance",
+        "expectedHole": "A0",
+        "detectedClass": "resistance",
+        "detectedHole": "A0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "R2",
+        "expectedClass": "resistance",
+        "expectedHole": "A2",
+        "detectedClass": "resistance",
+        "detectedHole": "A2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "U1",
+        "expectedClass": "ic_chip",
+        "expectedHole": "C5",
+        "detectedClass": "ic_chip",
+        "detectedHole": "C5",
+        "pinSide": "up",
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "LED1",
+        "expectedClass": "led",
+        "expectedHole": "A8",
+        "detectedClass": null,
+        "detectedHole": null,
+        "pinSide": null,
+        "defect": "Missing",
+        "verdict": "Fail"
+      },
+      {
+        "partId": "W1",
+        "expectedClass": "red_wire",
+        "expectedHole": "E0",
+        "detectedClass": "red_wire",
+        "detectedHole": "E0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W2",
+        "expectedClass": "red_wire",
+        "expectedHole": "E2",
+        "detectedClass": "red_wire",
+        "detectedHole": "E2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W3",
+        "expectedClass": "black_wire",
+        "expectedHole": "G0",
+        "detectedClass": "black_wire",
+        "detectedHole": "G0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W4",
+        "expectedClass": "white_wire",
+        "expectedHole": "G2",
+        "detectedClass": "white_wire",
+        "detectedHole": "G2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      }
+    ],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": null
+  },
+  {
+    "_note": "IC 방향: U1 뒤집힘(pin down)",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Fail",
+    "defectCount": 1,
+    "parts": [
+      {
+        "partId": "R1",
+        "expectedClass": "resistance",
+        "expectedHole": "A0",
+        "detectedClass": "resistance",
+        "detectedHole": "A0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "R2",
+        "expectedClass": "resistance",
+        "expectedHole": "A2",
+        "detectedClass": "resistance",
+        "detectedHole": "A2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "U1",
+        "expectedClass": "ic_chip",
+        "expectedHole": "C5",
+        "detectedClass": "ic_chip",
+        "detectedHole": "C5",
+        "pinSide": "down",
+        "defect": "Polarity",
+        "verdict": "Fail"
+      },
+      {
+        "partId": "LED1",
+        "expectedClass": "led",
+        "expectedHole": "A8",
+        "detectedClass": "led",
+        "detectedHole": "A8",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W1",
+        "expectedClass": "red_wire",
+        "expectedHole": "E0",
+        "detectedClass": "red_wire",
+        "detectedHole": "E0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W2",
+        "expectedClass": "red_wire",
+        "expectedHole": "E2",
+        "detectedClass": "red_wire",
+        "detectedHole": "E2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W3",
+        "expectedClass": "black_wire",
+        "expectedHole": "G0",
+        "detectedClass": "black_wire",
+        "detectedHole": "G0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W4",
+        "expectedClass": "white_wire",
+        "expectedHole": "G2",
+        "detectedClass": "white_wire",
+        "detectedHole": "G2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      }
+    ],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": null
+  },
+  {
+    "_note": "오부품: R1 자리에 LED",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Fail",
+    "defectCount": 1,
+    "parts": [
+      {
+        "partId": "R1",
+        "expectedClass": "resistance",
+        "expectedHole": "A0",
+        "detectedClass": "led",
+        "detectedHole": "A0",
+        "pinSide": null,
+        "defect": "WrongPart",
+        "verdict": "Fail"
+      },
+      {
+        "partId": "R2",
+        "expectedClass": "resistance",
+        "expectedHole": "A2",
+        "detectedClass": "resistance",
+        "detectedHole": "A2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "U1",
+        "expectedClass": "ic_chip",
+        "expectedHole": "C5",
+        "detectedClass": "ic_chip",
+        "detectedHole": "C5",
+        "pinSide": "up",
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "LED1",
+        "expectedClass": "led",
+        "expectedHole": "A8",
+        "detectedClass": "led",
+        "detectedHole": "A8",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W1",
+        "expectedClass": "red_wire",
+        "expectedHole": "E0",
+        "detectedClass": "red_wire",
+        "detectedHole": "E0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W2",
+        "expectedClass": "red_wire",
+        "expectedHole": "E2",
+        "detectedClass": "red_wire",
+        "detectedHole": "E2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W3",
+        "expectedClass": "black_wire",
+        "expectedHole": "G0",
+        "detectedClass": "black_wire",
+        "detectedHole": "G0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W4",
+        "expectedClass": "white_wire",
+        "expectedHole": "G2",
+        "detectedClass": "white_wire",
+        "detectedHole": "G2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      }
+    ],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": null
+  },
+  {
+    "_note": "전선 색: W1(빨강) 자리에 검정",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Fail",
+    "defectCount": 1,
+    "parts": [
+      {
+        "partId": "R1",
+        "expectedClass": "resistance",
+        "expectedHole": "A0",
+        "detectedClass": "resistance",
+        "detectedHole": "A0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "R2",
+        "expectedClass": "resistance",
+        "expectedHole": "A2",
+        "detectedClass": "resistance",
+        "detectedHole": "A2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "U1",
+        "expectedClass": "ic_chip",
+        "expectedHole": "C5",
+        "detectedClass": "ic_chip",
+        "detectedHole": "C5",
+        "pinSide": "up",
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "LED1",
+        "expectedClass": "led",
+        "expectedHole": "A8",
+        "detectedClass": "led",
+        "detectedHole": "A8",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W1",
+        "expectedClass": "red_wire",
+        "expectedHole": "E0",
+        "detectedClass": "black_wire",
+        "detectedHole": "E0",
+        "pinSide": null,
+        "defect": "WireColorSwap",
+        "verdict": "Fail"
+      },
+      {
+        "partId": "W2",
+        "expectedClass": "red_wire",
+        "expectedHole": "E2",
+        "detectedClass": "red_wire",
+        "detectedHole": "E2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W3",
+        "expectedClass": "black_wire",
+        "expectedHole": "G0",
+        "detectedClass": "black_wire",
+        "detectedHole": "G0",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      },
+      {
+        "partId": "W4",
+        "expectedClass": "white_wire",
+        "expectedHole": "G2",
+        "detectedClass": "white_wire",
+        "detectedHole": "G2",
+        "pinSide": null,
+        "defect": null,
+        "verdict": "Pass"
+      }
+    ],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": null
+  },
+  {
+    "_note": "검사 불가",
+    "inspectionId": "00000000-0000-0000-0000-000000000000",
+    "verdict": "Invalid",
+    "defectCount": 0,
+    "parts": [],
+    "imageUrl": null,
+    "latencyMs": 800,
+    "errorCode": "MARKER_NOT_FOUND"
+  }
+]
