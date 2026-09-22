@@ -52,7 +52,9 @@ _COL_MATCH_RADIUS = 15
 # 열 x좌표를 묶을 때, 이 픽셀 이내면 같은 열로 본다 (실측 열 내부 편차 ~13px 이내).
 _COL_GROUP_GAP_PX = 10
 # 이 개수 미만으로 뭉친 그룹은 실제 열이 아니라 잡음(행 번호 라벨 등)으로 간주해 버린다.
-_MIN_COL_GROUP_SIZE = 10
+# (10이었다가 13으로 올림: 라벨 잡음 그룹이 실측으로 최대 n=10까지 나온 적이
+# 있어서, 실제 열의 최소 개수(실측 n=15 이상)와 확실히 구분되도록 여유를 둠)
+_MIN_COL_GROUP_SIZE = 13
 
 # 같은 열 안에서, 이 픽셀 이내로 붙어있으면 같은 홀(중첩 컨투어)로 보고 하나로 합친다.
 _ROW_DEDUP_GAP_PX = 8
@@ -125,33 +127,56 @@ def _fit_row_plane(col_xs: list[float], col_ys: list[list[float]], pitch: float)
     선형보간했을 때 생기던 "같은 행인데 열마다 살짝 다른 높이" 문제가
     구조적으로 없어진다 (모듈 docstring 참고).
 
-    각 홀이 "몇 번째 행"인지는, 그 열의 반대쪽 끝(신뢰할 수 있는 쪽)과
+    각 홀이 "몇 번째 행"인지는 1차로 그 열의 반대쪽 끝(신뢰할 수 있는 쪽)과
     전역 피치로 역산해서 추정한다 (카메라가 살짝 기울어져 있으면 크롭
     경계에 A~U 범위 밖의 여분 홀이 하나 더 찍힐 수 있어서, 각 열의
     topmost/bottommost를 그대로 믿지 않는다 — WORKLOG.md 참고).
+
+    다만 이 1차 추정도, 그 열의 반대쪽 끝 자체가 부품에 가려 실제보다
+    일찍 끊긴 경우(예: IC나 전선이 열의 마지막 몇 홀을 가림)에는 통째로
+    틀릴 수 있다 (실측: board2.jpg 한 열에서 발생 — WORKLOG.md 참고). 그래서
+    1차로 대충 피팅한 평면으로 모든 점의 행 번호를 **다시 매긴 뒤**
+    재피팅한다 — 부품에 가려서 그 열 혼자만 엉뚱한 값을 냈어도, 다른 열
+    대부분이 정상이면 전역 평면 자체는 이미 대체로 맞으므로, 그 평면
+    기준으로 다시 매기면 바로잡힌다.
     """
-    rows = []  # (x, row_index, y)
-    for col_x, ys_here in zip(col_xs, col_ys):
-        predicted_top = ys_here[-1] - (N_ROWS - 1) * pitch
-        for y in ys_here:
-            row_index = round((y - predicted_top) / pitch)
-            if 0 <= row_index <= N_ROWS - 1:
-                rows.append((col_x, row_index, y))
+    def _assign_by_local_anchor() -> list[tuple[float, int, float]]:
+        rows = []
+        for col_x, ys_here in zip(col_xs, col_ys):
+            predicted_top = ys_here[-1] - (N_ROWS - 1) * pitch
+            for y in ys_here:
+                row_index = round((y - predicted_top) / pitch)
+                if 0 <= row_index <= N_ROWS - 1:
+                    rows.append((col_x, row_index, y))
+        return rows
 
-    if len(rows) < 10:
-        raise ValueError(f"행 평면을 피팅할 표본이 부족합니다 ({len(rows)}개).")
+    def _assign_by_plane(coef: np.ndarray) -> list[tuple[float, int, float]]:
+        rows = []
+        for col_x, ys_here in zip(col_xs, col_ys):
+            for y in ys_here:
+                row_index = round((y - coef[0] - coef[2] * col_x) / coef[1])
+                if 0 <= row_index <= N_ROWS - 1:
+                    rows.append((col_x, row_index, y))
+        return rows
 
-    data = np.array(rows, dtype=np.float64)
-    design = np.column_stack([np.ones(len(data)), data[:, 1], data[:, 0]])
-    target = data[:, 2]
+    def _lstsq_with_outlier_rejection(rows: list[tuple[float, int, float]]) -> np.ndarray:
+        if len(rows) < 10:
+            raise ValueError(f"행 평면을 피팅할 표본이 부족합니다 ({len(rows)}개).")
+        data = np.array(rows, dtype=np.float64)
+        design = np.column_stack([np.ones(len(data)), data[:, 1], data[:, 0]])
+        target = data[:, 2]
 
-    coef, *_ = np.linalg.lstsq(design, target, rcond=None)
-    # 이상치(occlusion·잡음으로 잘못 매칭된 점) 한 번 걸러내고 재피팅.
-    residuals = target - design @ coef
-    keep = np.abs(residuals) < _PLANE_OUTLIER_PX
-    if keep.sum() >= 10:
-        coef, *_ = np.linalg.lstsq(design[keep], target[keep], rcond=None)
+        coef, *_ = np.linalg.lstsq(design, target, rcond=None)
+        residuals = target - design @ coef
+        keep = np.abs(residuals) < _PLANE_OUTLIER_PX
+        if keep.sum() >= 10:
+            coef, *_ = np.linalg.lstsq(design[keep], target[keep], rcond=None)
+        return coef
 
+    coef = _lstsq_with_outlier_rejection(_assign_by_local_anchor())
+    # 1차 평면 기준으로 행 번호를 다시 매기고 재피팅 (부품에 가려 한쪽 끝이
+    # 틀린 열도 전역 평면 기준으로 바로잡힘).
+    coef = _lstsq_with_outlier_rejection(_assign_by_plane(coef))
     return coef
 
 

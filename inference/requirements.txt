@@ -4,3 +4,4 @@ python-multipart
 pydantic
 numpy
 opencv-python-headless
+pytesseract

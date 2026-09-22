@@ -25,7 +25,9 @@ _MIN_SATURATION = 100
 _MIN_VALUE = 80
 
 # 선으로 인정하려면 세로로 이 비율 이상 이어져 있어야 한다 (잡음 제거).
-_MIN_LINE_HEIGHT_RATIO = 0.5
+# (0.5였다가 0.3으로 낮춤: board2.jpg에서 조명이 고르지 않은 레일 선은
+# 채도가 군데군데 끊겨서 50%를 못 넘겼음 — WORKLOG.md 참고)
+_MIN_LINE_HEIGHT_RATIO = 0.3
 # 몇 픽셀 이내면 같은 선(굵기)으로 묶을지.
 _CLUSTER_GAP_PX = 5
 
@@ -114,6 +116,47 @@ def find_populated_unit_x_range(image: np.ndarray) -> tuple[int, int]:
     """
     candidates = _all_unit_candidates(image)
     return max(candidates, key=lambda xy: _edge_density(image, *xy))
+
+
+def _line_angle(mask: np.ndarray, x_center: int, margin: int = 15) -> float | None:
+    """mask에서 x_center 근방(폭 margin*2)의 픽셀들로 그 선의 실제 기울기를 잰다.
+
+    수직에서 벗어난 각도(도, 시계 방향 양수)를 반환. 픽셀이 너무 적으면 None.
+    """
+    lo, hi = max(0, x_center - margin), x_center + margin
+    ys, xs = np.where(mask[:, lo:hi])
+    if len(ys) < 50:
+        return None
+
+    xs = xs.astype(np.float64) + lo
+    ys = ys.astype(np.float64)
+    # x = a*y + b 선형회귀. 완전한 수직선이면 a=0.
+    a, _b = np.linalg.lstsq(np.column_stack([ys, np.ones_like(ys)]), xs, rcond=None)[0]
+    return float(np.degrees(np.arctan(a)))
+
+
+def measure_tilt_angle(image: np.ndarray, x1: int, x2: int) -> float:
+    """선택된 단위의 두 경계 레일 선(x1=빨강, x2=파랑)으로 실제 기울기를 측정한다.
+
+    90도 회전은 "카메라가 눕혀서 찍혔다"는 큰 방향만 바로잡을 뿐, 카메라
+    장착 각도가 정확히 90도가 아니면 레일 선이 완벽한 수직이 아닐 수 있다.
+    이 각도를 재서 `roi.py`가 한 번 더 미세하게 돌리는 데(deskew) 쓴다.
+
+    사진 전체가 아니라 **선택된 단위의 두 경계선만** 쓴다 — 실측해보니
+    렌즈 왜곡/원근 때문에 사진 안에서도 위치(x)에 따라 기울기가 조금씩
+    다르게 측정됐다(예: 왼쪽 끝 -1.0도, 오른쪽 끝 -0.2도). 사진 전체의
+    평균 각도를 쓰면 정작 우리가 쓸 단위 안에서는 안 맞을 수 있어서, 그
+    단위 자신의 경계선 각도만 쓴다.
+    """
+    hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
+    h, s, v = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
+    red_mask = ((h < _RED_HUE_LOW) | (h > _RED_HUE_HIGH)) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
+    blue_mask = (h > _BLUE_HUE_LOW) & (h < _BLUE_HUE_HIGH) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
+
+    angles = [a for a in (_line_angle(red_mask, x1), _line_angle(blue_mask, x2)) if a is not None]
+    if not angles:
+        raise ValueError("기울기를 측정할 레일 선 픽셀이 부족합니다.")
+    return float(np.mean(angles))
 
 
 def find_center_unit_x_range(image: np.ndarray) -> tuple[int, int]:
