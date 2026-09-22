@@ -1,9 +1,11 @@
 ﻿<Application x:Class="Inspection.Hmi.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:local="clr-namespace:Inspection.Hmi"
-             StartupUri="MainWindow.xaml">
+             xmlns:conv="clr-namespace:Inspection.Hmi.Converters">
     <Application.Resources>
-         
+        <conv:VerdictToBrushConverter x:Key="VerdictToBrush"/>
+        <conv:VerdictToTextConverter x:Key="VerdictToText"/>
+        <conv:DefectTypeToTextConverter x:Key="DefectToText"/>
+        <conv:HoleListConverter x:Key="HoleList"/>
     </Application.Resources>
 </Application>

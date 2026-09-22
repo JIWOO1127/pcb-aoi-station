@@ -17,4 +17,10 @@
     <ProjectReference Include="..\Inspection.Contracts\Inspection.Contracts.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="MockData\mock-results.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
 </Project>
