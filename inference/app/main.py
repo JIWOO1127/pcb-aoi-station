@@ -15,8 +15,7 @@ import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
-from board import DetectedBox, all_holes, match_holes_to_boxes
-from calibration import GridCalibration
+from board import DetectedBox, all_holes_from_image, match_holes_to_boxes
 from roi import crop_to_roi
 
 app = FastAPI(title="PCB AOI 추론 서비스")
@@ -55,24 +54,20 @@ def run_inference(image_bytes: bytes) -> List[PartResult]:
     """이미지 한 장을 받아, 핀홀별 장착 부품을 반환한다.
 
     단계:
-    0. 이미지를 디코딩하고, 고정 ROI로 크롭한다. 카메라·지그가 고정돼 있어서
-       보드가 대략 나오는 영역도 고정 사각형으로 미리 잘라낼 수 있다. (roi.py)
-    1. 보드 네 모서리 핀홀(A0, A13, U0, U13)의 픽셀 좌표를 찾는다.        [TODO]
-    2. YOLO로 부품을 탐지해 박스(픽셀 좌표)를 얻는다.                    [TODO]
-    3. 핀홀 282개의 기대 픽셀 위치를 계산하고, 박스와 대조해 어느 핀홀이
-       가려져 있는지(=장착돼 있는지) 구한다. (board.py, calibration.py로 구현됨)
+    0. 이미지를 디코딩하고, 고정+레일 검출 ROI로 크롭한다. (roi.py)
+    1. 크롭된 이미지에서 홀(구멍)을 직접 검출해, 핀홀 282개의 기대 픽셀
+       위치를 계산한다. (board.py, board_detect.py)
+    2. 크롭된 이미지로 YOLO 부품을 탐지해 박스(픽셀 좌표)를 얻는다.      [TODO]
+    3. 핀홀 위치와 박스를 대조해 어느 핀홀이 가려져 있는지(=장착돼 있는지) 구한다.
     4. 가려진(=장착된) 핀홀만 골라 응답으로 만든다.
 
-    1~3단계는 모두 크롭된 이미지 기준 픽셀 좌표로 이뤄진다.
+    1 이후 단계는 모두 크롭된 이미지 기준 픽셀 좌표로 이뤄진다.
     """
     image = _decode_image(image_bytes)
-    roi_image = crop_to_roi(image)  # TODO: roi.py의 ROI 좌표 실측 필요
+    roi_image = crop_to_roi(image)
 
-    corners = find_board_corners(roi_image)  # TODO
+    _, holes = all_holes_from_image(roi_image)
     boxes = detect_parts(roi_image)  # TODO
-
-    calibration = GridCalibration.from_corners(**corners)
-    holes = all_holes(calibration)
     match_holes_to_boxes(holes, boxes)
 
     return [
@@ -89,18 +84,6 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
     if image is None:
         raise HTTPException(status_code=400, detail="이미지를 디코딩할 수 없습니다.")
     return image
-
-
-def find_board_corners(roi_image: np.ndarray) -> dict:
-    """크롭된 이미지에서 보드 네 모서리 핀홀(A0, A13, U0, U13)의 픽셀 좌표를 찾는다.
-
-    TODO: 실제 촬영 이미지로 확인 필요 — 모서리에 별도 기준 마크가 있는지,
-    아니면 핀홀 자체를 검출해서 가장자리 4개를 골라야 하는지 등.
-
-    반환값은 GridCalibration.from_corners()에 그대로 넣을 수 있는 형태:
-    {"top_left": (x, y), "top_right": (x, y), "bottom_left": (x, y), "bottom_right": (x, y)}
-    """
-    raise NotImplementedError("보드 모서리 핀홀 검출 필요")
 
 
 def detect_parts(roi_image: np.ndarray) -> List[DetectedBox]:
