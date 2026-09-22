@@ -5,4 +5,5 @@
   <Project Path="Inspection.Contracts/Inspection.Contracts.csproj" />
   <Project Path="Inspection.Hmi/Inspection.Hmi.csproj" />
   <Project Path="Inspection.Station/Inspection.Station.csproj" />
+  <Project Path="Inspection.Tests/Inspection.Tests.csproj" Id="6fc8c54d-006d-4d6b-bc08-8214e67a0691" />
 </Solution>
