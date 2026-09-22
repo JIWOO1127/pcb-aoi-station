@@ -49,6 +49,10 @@
   - `roi.ROI`: 실제 카메라로 촬영 후 크롭 좌표 채우기
   - `find_board_corners`: 크롭된 이미지에서 네 모서리 핀홀(A0/A13/U0/U13)의 픽셀 좌표를 실제로 찾는 로직 (기준 마크가 있는지, 핀홀 자체를 검출해야 하는지 실제 촬영 이미지로 확인 필요)
   - `detect_parts`: YOLO 모델 연동
+- **`/infer` 수동 테스트 성공** (`pcb-aoi` conda 환경에서 `uvicorn main:app --reload --port 8001` 실행, `/docs` Swagger UI로 실제 jpg 업로드):
+  - jpg 업로드 → `500 Internal Server Error` 응답, 서버 콘솔에는 `NotImplementedError: ROI 좌표가 아직 설정되지 않았습니다` 출력 확인
+  - 즉 content-type 검증 → 이미지 바이트 수신 → JPEG 디코딩까지는 정상 동작 확인됨. 그다음 `roi.crop_to_roi`에서 의도한 대로 멈춤
+  - 다음 실제 확인이 필요한 지점은 `roi.ROI` 값부터
 
 ### 머신비전 구성 개념 정리
 
