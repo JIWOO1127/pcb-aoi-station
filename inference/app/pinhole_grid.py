@@ -16,9 +16,8 @@ E, K, Q 행은 전원 레일이 없어서 0, 1, 12, 13열 핀홀이 존재하지
 이 모듈은 "그리드 좌표(행 인덱스, 열 인덱스 실수값)"를 가장 가까운
 실제 핀홀 라벨(예: "J9")로 스냅하는 것까지만 담당한다.
 
-픽셀 좌표 <-> 그리드 좌표 변환은 [calibration.py](calibration.py),
-핀홀 282개 전체를 이미지 속 위치·부품 점유 여부와 함께 구조화하는 것은
-[board.py](board.py) 참고.
+픽셀 좌표 계산은 [board_detect.py](board_detect.py), 핀홀 282개 전체를
+이미지 속 위치·부품 점유 여부와 함께 구조화하는 것은 [board.py](board.py) 참고.
 """
 
 ROWS = "ABCDEFGHIJKLMNOPQRSTU"  # 21개 행: A ~ U (위 -> 아래)

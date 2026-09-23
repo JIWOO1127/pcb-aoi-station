@@ -19,8 +19,9 @@
 판정(정상/누락/오장착 등)은 여기서 하지 않는다 — 그건 스테이션의 몫이고,
 이 모듈은 "어느 핀홀이 가려져 있는지"까지만 구조화한다.
 
-(예전에는 calibration.py의 네 모서리 호모그래피로 위치를 계산했는데, 열
-간격이 균등하지 않은 걸 표현 못 해서 부정확했다. calibration.py 문서 참고.)
+(예전에는 네 모서리 호모그래피로 위치를 계산했는데, 열 간격이 균등하지
+않은 걸 표현 못 해서 부정확했다 — 지금은 삭제됨. 자세한 시행착오는
+WORKLOG.md 참고.)
 """
 
 from dataclasses import dataclass
@@ -28,7 +29,6 @@ from dataclasses import dataclass
 import numpy as np
 
 from board_detect import find_pinhole_pixels
-from calibration import GridCalibration
 from pinhole_grid import ROWS, col_range
 
 
@@ -61,32 +61,25 @@ class Hole:
         return self.part_class is not None
 
 
-def all_holes(calibration: GridCalibration) -> list[Hole]:
-    """282개 핀홀 전부를, 이 이미지 기준 기대 픽셀 위치와 함께 만든다.
+def all_holes_from_image(
+    image: np.ndarray, scale: float = 1.0, label_anchors: list[tuple[int, float, float]] | None = None
+) -> tuple[np.ndarray, list[Hole]]:
+    """이미지에서 홀을 직접 검출해 282개 핀홀을 만든다.
 
-    (레거시) calibration.py의 네 모서리 호모그래피로 위치를 계산한다 — 열
-    간격이 균등하지 않은 걸 표현 못 해서 부정확하다. 새 코드는
-    `all_holes_from_image`를 쓴다.
-    """
-    holes = []
-    for row_i, row in enumerate(ROWS):
-        col_min, col_max = col_range(row)
-        for col_i in range(col_min, col_max + 1):
-            pixel = calibration.grid_to_pixel(row_i, col_i)
-            holes.append(Hole(label=f"{row}{col_i}", row=row_i, col=col_i, pixel=pixel))
-    return holes
+    board_detect.find_pinhole_pixels로 열마다 실제 열 간격·기울기를 실측한다.
+    이미지 자체는 변형하지 않는다.
 
+    scale: `roi.crop_to_roi`가 반환한 해상도 배율. board_detect의 픽셀 기반
+    상수들을 실제 해상도에 맞게 비례 조정하는 데 쓰인다 (scale.py 참고).
 
-def all_holes_from_image(image: np.ndarray) -> tuple[np.ndarray, list[Hole]]:
-    """이미지에서 홀을 직접 검출해 282개 핀홀을 만든다 (권장 경로).
-
-    board_detect.find_pinhole_pixels로 열마다 실제 열 간격·기울기를 실측하므로,
-    calibration.py 기반 all_holes보다 정확하다. 이미지 자체는 변형하지 않는다.
+    label_anchors: `roi.crop_to_roi`가 반환한, OCR로 찾은 행 번호 라벨의
+    (행번호, x, y) 앵커 목록(크롭 후 좌표계). 있으면 board_detect가 행 평면을
+    피팅할 때 열별 추정보다 이 앵커를 우선한다 (WORKLOG.md 참고).
 
     반환: (입력 image 그대로, Hole 리스트). image도 함께 반환하는 건 나중에
     실제로 이미지를 보정하는 방식으로 바뀌어도 호출부(main.py)가 안 바뀌게 하기 위함.
     """
-    detected = find_pinhole_pixels(image)
+    detected = find_pinhole_pixels(image, scale, label_anchors)
     holes = []
     for row_i, row in enumerate(ROWS):
         col_min, col_max = col_range(row)
@@ -96,15 +89,32 @@ def all_holes_from_image(image: np.ndarray) -> tuple[np.ndarray, list[Hole]]:
     return detected.image, holes
 
 
+# LED·커패시터는 둥근 몸통이 여러 핀홀 위에 걸쳐 보이지만(박스 안에 핀홀
+# 후보가 여러 개 잡힘), 실제 다리는 2개뿐이고 몸통 중심 바로 아래로 나온다.
+# 그래서 박스 안 후보 중 "박스 중심에 가장 가까운 2개"를 진짜 다리로 본다.
+# wire·resistance·ic_chip은 다리 위치 판별 로직이 아직 없어서 기존처럼 박스 안
+# 홀을 전부 장착으로 표시한다 (다음 단계에서 클래스별로 추가 예정).
+_ROUND_PART_CLASSES = {"led", "capacitor"}
+_ROUND_PART_LEG_COUNT = 2
+
+
 def match_holes_to_boxes(holes: list[Hole], boxes: list[DetectedBox]) -> None:
     """각 홀의 기대 픽셀 위치가 어떤 박스 안에 들어가는지 보고, 그 홀을 채운다.
 
     holes를 제자리에서 수정한다 (반환값 없음).
     """
-    for hole in holes:
-        x, y = hole.pixel
-        for box in boxes:
-            if box.contains(x, y):
-                hole.part_class = box.part_class
-                hole.confidence = box.confidence
-                break  # 박스 두 개가 겹쳐서 같은 홀을 덮는 경우는 드묾 -> 먼저 찾은 것 사용
+    for box in boxes:
+        contained = [hole for hole in holes if hole.part_class is None and box.contains(*hole.pixel)]
+        if not contained:
+            continue
+
+        if box.part_class in _ROUND_PART_CLASSES:
+            cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
+            contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
+            contained = contained[:_ROUND_PART_LEG_COUNT]
+
+        for hole in contained:
+            hole.part_class = box.part_class
+            hole.confidence = box.confidence
+            # 박스 두 개가 겹쳐서 같은 홀을 덮는 경우는 드묾 -> 먼저 찾은 박스 사용
+            # (hole.part_class is None 조건으로 이미 걸러짐)
