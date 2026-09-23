@@ -1,0 +1,16 @@
+{
+  "weights": "best_fasterrcnn_20260923_1007.pth",
+  "model": "fasterrcnn_resnet50_fpn",
+  "best_epoch": 13,
+  "best_valid_loss": 0.6976317726075649,
+  "epochs": 30,
+  "batch_size": 2,
+  "lr": 0.005,
+  "momentum": 0.9,
+  "weight_decay": 0.0005,
+  "seed": 42,
+  "augmentation": "none",
+  "train_images": 65,
+  "valid_images": 8,
+  "device": "Tesla T4"
+}
