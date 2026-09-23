@@ -86,8 +86,8 @@ async def infer_debug(image: UploadFile = File(...)) -> InferDebugResponse:
 
     image_bytes = await image.read()
     decoded = _decode_image(image_bytes)
-    roi_image = crop_to_roi(decoded)
-    _, holes = all_holes_from_image(roi_image)
+    roi_image, img_scale, label_anchors = crop_to_roi(decoded)
+    _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
 
     return InferDebugResponse(
         pinholes=[DebugPinhole(pinhole=h.label, x=h.pixel[0], y=h.pixel[1]) for h in holes]
@@ -108,9 +108,9 @@ def run_inference(image_bytes: bytes) -> List[PartResult]:
     1 이후 단계는 모두 크롭된 이미지 기준 픽셀 좌표로 이뤄진다.
     """
     image = _decode_image(image_bytes)
-    roi_image = crop_to_roi(image)
+    roi_image, img_scale, label_anchors = crop_to_roi(image)
 
-    _, holes = all_holes_from_image(roi_image)
+    _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
     boxes = detect_parts(roi_image)  # TODO
     match_holes_to_boxes(holes, boxes)
 
