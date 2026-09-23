@@ -58,9 +58,8 @@ public partial class MainViewModel : ObservableObject
     {
         DefectType.Missing => $"{p.PartId} 누락",
         DefectType.WrongPart => $"{p.PartId} 오부품({p.ExpectedClass}→{p.DetectedClass})",
-        DefectType.WireColorSwap => $"{p.PartId} 전선 색",
+        DefectType.WireColorSwap => $"{p.PartId} 전선 색 뒤바뀜",
         DefectType.Offset => $"{p.PartId} 위치 어긋남",
-        DefectType.Polarity => $"{p.PartId} IC 방향",
         DefectType.Extra => $"{p.PartId} 추가 부품",
         _ => p.PartId
     };
