@@ -1,0 +1,14 @@
+{
+  "id": "classic",
+  "display_name": "Classic (OpenCV rule-based)",
+  "version": "0.1.0",
+  "owner": "",
+  "framework": "opencv",
+  "weights_file": "",
+  "entry_point": "run.py",
+  "entry_function": "run",
+  "input_size": null,
+  "classes": ["ok", "ng"],
+  "description": "crop -> align -> diff -> segment -> judge 규칙 기반 파이프라인",
+  "created_at": "2026-09-23"
+}
