@@ -101,7 +101,7 @@ def run_inference(image_bytes: bytes) -> List[PartResult]:
     0. 이미지를 디코딩하고, 고정+레일 검출 ROI로 크롭한다. (roi.py)
     1. 크롭된 이미지에서 홀(구멍)을 직접 검출해, 핀홀 282개의 기대 픽셀
        위치를 계산한다. (board.py, board_detect.py)
-    2. 크롭된 이미지로 YOLO 부품을 탐지해 박스(픽셀 좌표)를 얻는다.      [TODO]
+    2. 크롭된 이미지로 YOLO 부품을 탐지해 박스(픽셀 좌표)를 얻는다. (detect_parts)
     3. 핀홀 위치와 박스를 대조해 어느 핀홀이 가려져 있는지(=장착돼 있는지) 구한다.
     4. 가려진(=장착된) 핀홀만 골라 응답으로 만든다.
 
@@ -111,7 +111,7 @@ def run_inference(image_bytes: bytes) -> List[PartResult]:
     roi_image, img_scale, label_anchors = crop_to_roi(image)
 
     _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
-    boxes = detect_parts(roi_image)  # TODO
+    boxes = detect_parts(roi_image)
     match_holes_to_boxes(holes, boxes)
 
     return [
