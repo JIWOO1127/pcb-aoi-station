@@ -33,6 +33,16 @@ class InferResponse(BaseModel):
     parts: List[PartResult]
 
 
+class DebugPinhole(BaseModel):
+    pinhole: str  # 핀홀 라벨 (예: "J9")
+    x: float  # 크롭된 이미지 기준 픽셀 x좌표
+    y: float  # 크롭된 이미지 기준 픽셀 y좌표
+
+
+class InferDebugResponse(BaseModel):
+    pinholes: List[DebugPinhole]
+
+
 @app.get("/health")
 def health() -> dict:
     return {"status": "ok"}
@@ -48,6 +58,29 @@ async def infer(image: UploadFile = File(...)) -> InferResponse:
     image_bytes = await image.read()
     parts = run_inference(image_bytes)
     return InferResponse(parts=parts)
+
+
+@app.post("/infer/debug", response_model=InferDebugResponse)
+async def infer_debug(image: UploadFile = File(...)) -> InferDebugResponse:
+    """임시 테스트용 엔드포인트: `detect_parts`(YOLO)가 아직 없어서, /infer처럼
+    "가려진 핀홀만" 거르는 대신 검출된 핀홀 282개 전부의 픽셀 위치를 반환한다.
+
+    스테이션에서 실제로 이미지를 보내 크롭+핀홀검출 파이프라인이 잘 도는지
+    확인하는 용도. detect_parts가 완성되면 지워도 된다.
+    """
+    if image.content_type != "image/jpeg":
+        raise HTTPException(
+            status_code=415, detail="image는 JPEG(image/jpeg)만 지원합니다."
+        )
+
+    image_bytes = await image.read()
+    decoded = _decode_image(image_bytes)
+    roi_image = crop_to_roi(decoded)
+    _, holes = all_holes_from_image(roi_image)
+
+    return InferDebugResponse(
+        pinholes=[DebugPinhole(pinhole=h.label, x=h.pixel[0], y=h.pixel[1]) for h in holes]
+    )
 
 
 def run_inference(image_bytes: bytes) -> List[PartResult]:
