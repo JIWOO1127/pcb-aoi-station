@@ -60,6 +60,34 @@ _COL_GROUP_GAP_PX = 10
 # 이건 "개수"라서 해상도와 무관 — scale로 조정하지 않는다.
 _MIN_COL_GROUP_SIZE = 13
 
+# 이 IQR(사분위 범위, 25~75퍼센타일 폭) 이내인 열만 "확실한 열"로 본다.
+# 처음엔 최대-최소(x폭)로 판정했는데, 노이즈로 튄 점 한두 개만 있어도(진짜
+# 멀쩡한 열인데) 최대-최소가 20px 넘게 벌어져서 실측(new_test_images/
+# board1.jpg)해보니 오탐이 많았다. IQR은 소수 이상치에 안 흔들리는데,
+# 실제로 여러 조각이 병합된 열(board2.jpg, x=411 부근)은 IQR 자체가
+# 24.8까지 벌어져서 멀쩡한 열들(전부 3 이하)과 뚜렷하게 구분됐다
+# (WORKLOG.md 참고).
+_CONFIDENT_COL_IQR_PX = 12
+
+# 열 배치는 [레일 2열][단자부 5열][채널][단자부 5열][레일 2열] 순서라, 이
+# 구간 경계(1↔2, 6↔7, 11↔12)에서는 원래 간격이 정상 피치의 3배 가까이
+# 넓다 (_fill_missing_columns 참고). `_respace_unconfident_columns`가 이걸
+# 모르고 구간 경계 너머의 확실한 열까지 걸쳐서 균등 재배치하면, 원래
+# 넓어야 할 간격까지 정상 피치처럼 뭉개버린다 (실측: new_test_images/
+# board2.jpg — 열 9(확실, 단자부)~열 12(확실, 레일) 사이를 3등분해서 열
+# 10·11 위치가 41.9px 균등 간격으로 나왔는데, 정상 피치는 ~27~29px이고
+# 열 11~12 사이만 ~75px이어야 한다. WORKLOG.md 참고). 그래서 재배치는 이
+# 구간 안에서만 하고, 구간을 넘어서는 확실한 열은 앵커로 쓰지 않는다.
+_COL_SEGMENTS = [(0, 1), (2, 6), (7, 11), (12, 13)]
+
+
+def _col_segment_id(col_index: int) -> int:
+    for seg_id, (lo, hi) in enumerate(_COL_SEGMENTS):
+        if lo <= col_index <= hi:
+            return seg_id
+    raise ValueError(f"열 인덱스 {col_index}가 어느 구간에도 속하지 않습니다.")
+
+
 # 같은 열 안에서, 이 픽셀 이내로 붙어있으면 같은 홀(중첩 컨투어)로 보고 하나로 합친다.
 _ROW_DEDUP_GAP_PX = 8
 # 한 칸(행) 피치로 인정할 값의 범위. 실측(~50~60px) 기준으로 넉넉히 잡되,
@@ -378,7 +406,20 @@ def _fit_columns(centroids: np.ndarray, scale: float = 1.0) -> list[float]:
         # 제외한다.
         real_columns = sorted(real_columns, key=lambda g: max(g) - min(g))[:N_COLS]
 
-    col_xs = sorted(float(np.mean(g)) for g in real_columns)
+    # 각 열이 "확실한지"도 같이 기록한다 — 개수는 충분해도(_MIN_COL_GROUP_SIZE
+    # 이상) 병합을 거치며 여러 조각이 억지로 이어붙은 열은 그 위치 자체가
+    # 흔들렸을 수 있다 (실측: new_test_images/board2.jpg — IC칩에 가려
+    # 조각난 열이 병합되면서 위치가 실제보다 어긋남. WORKLOG.md 참고).
+    def _iqr(g: list[float]) -> float:
+        arr = np.array(g)
+        return float(np.percentile(arr, 75) - np.percentile(arr, 25))
+
+    col_entries = sorted(
+        ((float(np.mean(g)), _iqr(g) <= _CONFIDENT_COL_IQR_PX * scale) for g in real_columns),
+        key=lambda e: e[0],
+    )
+    col_xs = [x for x, _ in col_entries]
+    confident = [c for _, c in col_entries]
 
     if len(col_xs) < N_COLS:
         # 부품에 가려서 "확실한 열"로 인정받을 만큼(≥_MIN_COL_GROUP_SIZE)
@@ -386,17 +427,104 @@ def _fit_columns(centroids: np.ndarray, scale: float = 1.0) -> list[float]:
         # 찾은 뒤, **그 자리에 마침 실제로 검출된 조각(개수는 부족해도
         # 위치는 진짜 측정값)이 있으면 그 실측 위치를 우선 쓰고**, 없으면
         # 산수로 계산한 위치를 그대로 쓴다 — 렌즈 왜곡 등으로 피치가 구간마다
-        # 살짝 달라서, 산수 위치가 실제보다 몇 픽셀 어긋날 수 있기 때문
-        # (실측: new_test_images/board2.jpg의 IC칩 옆 열 — WORKLOG.md 참고).
+        # 살짝 달라서, 산수 위치가 실제보다 몇 픽셀 어긋날 수 있기 때문.
+        # 이렇게 채운 열은 아래 재배치 대상이 되도록 "확실하지 않음"으로 표시.
+        # (기존 열의 확실함 여부는 그대로 유지 — 새로 채워진 열만 새로 판정)
+        conf_by_x = dict(zip(col_xs, confident))
         leftover = [g for g in groups if len(g) < _MIN_COL_GROUP_SIZE]
         col_xs = _fill_missing_columns(col_xs, leftover)
+        confident = [conf_by_x.get(x, False) for x in col_xs]
 
     if len(col_xs) != N_COLS:
         raise ValueError(
             f"열이 {N_COLS}개가 아니라 {len(real_columns)}개 검출됐습니다 "
             f"(그룹별 개수: {[len(g) for g in groups]})."
         )
+
+    # 확실하지 않은 열이 확실한 열 근처에 있으면, 그 자리 좌표를 믿지 않고
+    # **확실한 열들로 검증된 피치대로 재배치**한다 — 애매한 조각·산수
+    # 추정치보다, 확실하게 검출된 열들로 검증된 간격이 더 믿을 만하다는
+    # 사용자 의견을 반영 (WORKLOG.md 참고).
+    normal_pitch = _estimate_normal_col_pitch(col_xs, confident)
+    col_xs = _respace_unconfident_columns(col_xs, confident, normal_pitch)
     return col_xs
+
+
+def _estimate_normal_col_pitch(col_xs: list[float], confident: list[bool]) -> float | None:
+    """확실한 열들 중, 같은 구간(레일/단자부) 안에서 바로 옆으로 붙은 것들의
+    간격만 모아 "정상 피치"를 구한다 (구간 경계의 넓은 채널 간격은 제외).
+    """
+    samples = [
+        col_xs[i + 1] - col_xs[i]
+        for i in range(len(col_xs) - 1)
+        if confident[i] and confident[i + 1] and _col_segment_id(i) == _col_segment_id(i + 1)
+    ]
+    return float(np.median(samples)) if samples else None
+
+
+def _respace_unconfident_columns(
+    col_xs: list[float], confident: list[bool], normal_pitch: float | None
+) -> list[float]:
+    """확실하지 않은 열들을, 같은 구간(레일/단자부) 안의 확실한 열을 기준으로
+    정상 피치에 맞춰 재배치한다.
+
+    부품에 심하게 가려 조각난 열은(개수는 맞아도 x폭이 넓게 병합되었거나,
+    산수/조각 복구로 채운 열) 자기 위치 자체가 몇~십 px 어긋날 수 있다.
+    반면 확실한 열들은 이미 정확하다고 검증됐으므로, 거기서부터 정상 피치로
+    뻗어나가는 게 애매한 자기 자신의 데이터보다 더 믿을 만하다.
+
+    구간(레일 2열/단자부 5열) 경계는 넘지 않는다 — 경계에는 원래 훨씬 넓은
+    채널 간격이 끼어있어서, 그 너머의 확실한 열까지 균등하게 나누면 오히려
+    그 넓은 간격을 정상 피치처럼 뭉개버린다 (실측: new_test_images/
+    board2.jpg — 열 9(확실)~열 12(확실, 다른 구간) 사이를 3등분해서 열
+    10·11이 41.9px 균등 간격으로 나왔는데, 정상 피치는 ~27~29px이고 열
+    11~12 사이만 ~75px이어야 한다. WORKLOG.md 참고).
+
+    같은 구간 안에 양쪽 다 확실한 열이 있으면 그 사이를 균등 재배치하고,
+    한쪽만 있으면 정상 피치로 그 방향으로 뻗어서 채우고, 양쪽 다 없으면(또는
+    정상 피치를 못 구했으면) 원래 위치를 그대로 둔다.
+    """
+    result = list(col_xs)
+    n = len(result)
+    i = 0
+    while i < n:
+        if confident[i]:
+            i += 1
+            continue
+        start = i
+        while i < n and not confident[i]:
+            i += 1
+        end = i  # confident[end]가 True이거나(끝났으면) n
+
+        # 이 구간 하나(run)가 여러 열 구간(레일/단자부)에 걸칠 수 있으므로,
+        # 구간 경계 단위로 쪼개서 각각 따로 보정한다.
+        seg_start = start
+        while seg_start < end:
+            seg = _col_segment_id(seg_start)
+            seg_end = seg_start
+            while seg_end < end and _col_segment_id(seg_end) == seg:
+                seg_end += 1
+
+            left_ok = seg_start > 0 and confident[seg_start - 1] and _col_segment_id(seg_start - 1) == seg
+            right_ok = seg_end < n and confident[seg_end] and _col_segment_id(seg_end) == seg
+            count = seg_end - seg_start + 1
+
+            if left_ok and right_ok:
+                left_x, right_x = result[seg_start - 1], result[seg_end]
+                for k in range(seg_start, seg_end):
+                    result[k] = left_x + (right_x - left_x) * (k - seg_start + 1) / count
+            elif left_ok and normal_pitch is not None:
+                left_x = result[seg_start - 1]
+                for k in range(seg_start, seg_end):
+                    result[k] = left_x + normal_pitch * (k - seg_start + 1)
+            elif right_ok and normal_pitch is not None:
+                right_x = result[seg_end]
+                for k in range(seg_start, seg_end):
+                    result[k] = right_x - normal_pitch * (seg_end - k)
+            # 둘 다 없으면(또는 정상 피치를 못 구했으면) 원래 위치를 그대로 둔다.
+
+            seg_start = seg_end
+    return result
 
 
 def _fill_missing_columns(col_xs: list[float], leftover_groups: list[list[float]] | None = None) -> list[float]:
