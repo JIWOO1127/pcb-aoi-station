@@ -1,0 +1,291 @@
+{
+  "images": 8,
+  "iou_th": 0.5,
+  "score_th": 0.5,
+  "map50_95": 0.7214788198471069,
+  "map50": 0.9816808104515076,
+  "map75": 0.8721222281455994,
+  "mar100": 0.7731236219406128,
+  "ap50_95_per_class": {
+    "black_wire": 0.6885586380958557,
+    "capacitor": 0.8291725516319275,
+    "ic_chip": 0.8613613843917847,
+    "led": 0.8162376284599304,
+    "red_wire": 0.702477753162384,
+    "resistance330": 0.6788753867149353,
+    "resistance470": 0.6115511655807495,
+    "white_wire": 0.5835959315299988
+  },
+  "per_class": {
+    "black_wire": {
+      "tp": 22,
+      "fp": 1,
+      "fn": 0,
+      "gt": 22,
+      "precision": 0.9565217391304348,
+      "recall": 1.0,
+      "f1": 0.9777777777777777
+    },
+    "capacitor": {
+      "tp": 7,
+      "fp": 0,
+      "fn": 0,
+      "gt": 7,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "ic_chip": {
+      "tp": 11,
+      "fp": 0,
+      "fn": 0,
+      "gt": 11,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "led": {
+      "tp": 5,
+      "fp": 0,
+      "fn": 0,
+      "gt": 5,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "red_wire": {
+      "tp": 20,
+      "fp": 0,
+      "fn": 0,
+      "gt": 20,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    },
+    "resistance330": {
+      "tp": 10,
+      "fp": 4,
+      "fn": 1,
+      "gt": 11,
+      "precision": 0.7142857142857143,
+      "recall": 0.9090909090909091,
+      "f1": 0.8
+    },
+    "resistance470": {
+      "tp": 5,
+      "fp": 1,
+      "fn": 3,
+      "gt": 8,
+      "precision": 0.8333333333333334,
+      "recall": 0.625,
+      "f1": 0.7142857142857143
+    },
+    "white_wire": {
+      "tp": 15,
+      "fp": 0,
+      "fn": 0,
+      "gt": 15,
+      "precision": 1.0,
+      "recall": 1.0,
+      "f1": 1.0
+    }
+  },
+  "micro": {
+    "precision": 0.9405940594059405,
+    "recall": 0.9595959595959596,
+    "f1": 0.95
+  },
+  "macro": {
+    "precision": 0.9380175983436854,
+    "recall": 0.9417613636363636,
+    "f1": 0.9365079365079365
+  },
+  "accuracy": 0.9595959595959596,
+  "detection_rate": 1.0,
+  "gt_boxes": 99,
+  "false_positives_background": 2,
+  "confusion_matrix": {
+    "labels": [
+      "black_wire",
+      "capacitor",
+      "ic_chip",
+      "led",
+      "red_wire",
+      "resistance330",
+      "resistance470",
+      "white_wire",
+      "none"
+    ],
+    "rows_gt_cols_pred": [
+      [
+        22,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        7,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        11,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        20,
+        0,
+        0,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        10,
+        1,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        3,
+        5,
+        0,
+        0
+      ],
+      [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        15,
+        0
+      ],
+      [
+        1,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
+        0,
+        0
+      ]
+    ]
+  },
+  "latency": {
+    "mean_ms": 111.89840101999835,
+    "median_ms": 111.87484749996202,
+    "max_ms": 115.68456999998489,
+    "runs": 50,
+    "input_shape": [
+      3,
+      386,
+      684
+    ]
+  },
+  "meta": {
+    "test_set": "old8",
+    "test_dir": "/content/drive/MyDrive/Circuit testing 2 -test.v1i.coco/test",
+    "weights": "best_fasterrcnn_20260923_1007.pth",
+    "model": "fasterrcnn_resnet50_fpn",
+    "label_mapping": [
+      {
+        "json_id": 1,
+        "json_name": "black_wire",
+        "class": "black_wire",
+        "note": ""
+      },
+      {
+        "json_id": 2,
+        "json_name": "capacitor",
+        "class": "capacitor",
+        "note": ""
+      },
+      {
+        "json_id": 3,
+        "json_name": "ic_chip",
+        "class": "ic_chip",
+        "note": ""
+      },
+      {
+        "json_id": 4,
+        "json_name": "led",
+        "class": "led",
+        "note": ""
+      },
+      {
+        "json_id": 5,
+        "json_name": "red_wire",
+        "class": "red_wire",
+        "note": ""
+      },
+      {
+        "json_id": 6,
+        "json_name": "resistance330",
+        "class": "resistance330",
+        "note": ""
+      },
+      {
+        "json_id": 7,
+        "json_name": "resistance470",
+        "class": "resistance470",
+        "note": ""
+      },
+      {
+        "json_id": 8,
+        "json_name": "white_wire",
+        "class": "white_wire",
+        "note": ""
+      }
+    ],
+    "device": "Tesla T4",
+    "torch": "2.11.0+cu128",
+    "evaluated_at": "2026-09-23T10:24:30"
+  }
+}
