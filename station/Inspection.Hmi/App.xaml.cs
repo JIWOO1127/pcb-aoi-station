@@ -1,6 +1,8 @@
-﻿using System.Windows;
+﻿using System.IO;
+using System.Windows;
 using Inspection.Hmi.Services;
 using Inspection.Hmi.ViewModels;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -13,10 +15,28 @@ public partial class App : Application
     public App()
     {
         _host = Host.CreateDefaultBuilder()
-            .ConfigureServices(services =>
+            .ConfigureAppConfiguration(c =>
             {
-                // 실제 서버가 준비되면 이 한 줄만 HttpStationClient로 교체
-                services.AddSingleton<IStationClient, MockStationClient>();
+                c.SetBasePath(AppContext.BaseDirectory);
+                c.AddJsonFile("appsettings.json", optional: false);
+            })
+            .ConfigureServices((context, services) =>
+            {
+                // 검사할 이미지 공급처. 지금은 파일, 나중에 CameraImageSource로 교체·전환.
+                services.AddSingleton<FileImageSource>();
+                services.AddSingleton<IImageSource>(sp => sp.GetRequiredService<FileImageSource>());
+
+                // 스테이션 서버 호출.
+                // 서버 없이 화면만 보려면 아래 두 줄을 주석 처리하고
+                // services.AddSingleton<IStationClient, MockStationClient>(); 를 쓴다.
+                services.AddHttpClient<IStationClient, HttpStationClient>(client =>
+                {
+                    var baseUrl = context.Configuration["Station:BaseUrl"]
+                                  ?? "http://localhost:5215";
+                    client.BaseAddress = new Uri(baseUrl);
+                    client.Timeout = TimeSpan.FromSeconds(30);
+                });
+
                 services.AddSingleton<MainViewModel>();
                 services.AddSingleton<MainWindow>();
             })
