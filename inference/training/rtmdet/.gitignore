@@ -1,0 +1,4 @@
+# Downloads and generated training/evaluation files.
+/configs/
+/test_outputs/
+/outputs/*
