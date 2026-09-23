@@ -1,11 +1,9 @@
-# Portable copy of the trained RTMDet-m configuration.
-# Run from inference/training/rtmdet so the working directory locates the dataset.
-import os
-
-ROOT = os.getcwd()
-DATASET_ROOT = os.path.abspath(os.path.join(ROOT, "../../dataset/Circuit testing 2 -test.v1i.coco"))
+# Portable RTMDet-m config.
+# Paths are relative to inference/training/rtmdet.
 
 auto_scale_lr = dict(base_batch_size=16, enable=False)
+
+
 backend_args = None
 base_lr = 0.004
 custom_hooks = [
@@ -52,7 +50,7 @@ custom_hooks = [
         ],
         type='PipelineSwitchHook'),
 ]
-data_root = DATASET_ROOT + os.sep
+data_root = '../../dataset/Circuit testing 2 -test.v1i.coco/'
 dataset_type = 'CocoDataset'
 default_hooks = dict(
     checkpoint=dict(interval=10, max_keep_ckpts=3, type='CheckpointHook'),
@@ -184,7 +182,7 @@ test_dataloader = dict(
         ann_file='test/_annotations.coco.json',
         backend_args=None,
         data_prefix=dict(img='test/'),
-        data_root=DATASET_ROOT + os.sep,
+        data_root='../../dataset/22Circuit testing 2 -test.coco/',
         metainfo=dict(
             classes=(
                 'black_wire',
@@ -231,7 +229,7 @@ test_dataloader = dict(
     persistent_workers=True,
     sampler=dict(shuffle=False, type='DefaultSampler'))
 test_evaluator = dict(
-    ann_file=os.path.join(DATASET_ROOT, "test", "_annotations.coco.json"),
+    ann_file='../../dataset/22Circuit testing 2 -test.coco/test/_annotations.coco.json',
     backend_args=None,
     format_only=False,
     metric='bbox',
@@ -283,7 +281,7 @@ train_dataloader = dict(
         ann_file='train/_annotations.coco.json',
         backend_args=None,
         data_prefix=dict(img='train/'),
-        data_root=DATASET_ROOT + os.sep,
+        data_root='../../dataset/Circuit testing 2 -test.v1i.coco/',
         filter_cfg=dict(filter_empty_gt=True, min_size=32),
         metainfo=dict(
             classes=(
@@ -497,7 +495,7 @@ val_dataloader = dict(
         ann_file='valid/_annotations.coco.json',
         backend_args=None,
         data_prefix=dict(img='valid/'),
-        data_root=DATASET_ROOT + os.sep,
+        data_root='../../dataset/Circuit testing 2 -test.v1i.coco/',
         metainfo=dict(
             classes=(
                 'black_wire',
@@ -544,7 +542,7 @@ val_dataloader = dict(
     persistent_workers=True,
     sampler=dict(shuffle=False, type='DefaultSampler'))
 val_evaluator = dict(
-    ann_file=os.path.join(DATASET_ROOT, "valid", "_annotations.coco.json"),
+    ann_file='../../dataset/Circuit testing 2 -test.v1i.coco/valid/_annotations.coco.json',
     backend_args=None,
     format_only=False,
     metric='bbox',
@@ -563,4 +561,4 @@ visualizer = dict(
     vis_backends=[
         dict(type='LocalVisBackend'),
     ])
-work_dir = os.path.join(ROOT, "outputs")
+work_dir = 'outputs'
