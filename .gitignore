@@ -371,3 +371,10 @@ inference/**/*.jpeg
 inference/**/*.png
 inference/**/*.pt
 inference/**/*.onnx
+
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Training data is downloaded separately; keep local copies out of Git.
+/inference/dataset/
