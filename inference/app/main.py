@@ -8,17 +8,28 @@
 이 서비스는 절대 판정하지 않는다. (docs/api-contract.md 참고)
 """
 
+import os
+from pathlib import Path
 from typing import List
 
 import cv2
 import numpy as np
 from fastapi import FastAPI, File, HTTPException, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
+from ultralytics import YOLO
 
 from board import DetectedBox, all_holes_from_image, match_holes_to_boxes
 from roi import crop_to_roi
 
 app = FastAPI(title="PCB AOI 추론 서비스")
+
+# 부품 탐지 YOLO 모델(yolo8n.pt, 8종 학습됨: black_wire/capacitor/ic_chip/led/
+# red_wire/resistance330/resistance470/white_wire). 환경변수로 다른 경로의
+# 모델(예: RTMDet 등 추후 비교용)을 넣을 수 있게 기본값만 코드에 둔다.
+_MODEL_PATH = os.environ.get("YOLO_MODEL_PATH", str(Path(__file__).parent / "models" / "yolo8n.pt"))
+_CONFIDENCE_THRESHOLD = 0.25
+
+_model: YOLO | None = None
 
 
 class PartResult(BaseModel):
@@ -119,9 +130,35 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
     return image
 
 
+def _get_model() -> YOLO:
+    """YOLO 모델을 최초 1번만 로딩해서 재사용한다 (요청마다 다시 로딩하면 느림)."""
+    global _model
+    if _model is None:
+        _model = YOLO(_MODEL_PATH)
+    return _model
+
+
 def detect_parts(roi_image: np.ndarray) -> List[DetectedBox]:
     """크롭된 이미지에서 YOLO 모델로 부품을 탐지해 박스 목록을 반환한다.
 
-    TODO: YOLO 모델 로딩 및 추론.
+    `_CONFIDENCE_THRESHOLD` 미만인 탐지는 버린다. 부품 종류(class)는 모델에
+    학습된 이름(model.names)을 그대로 쓴다.
     """
-    raise NotImplementedError("YOLO 모델 연동 필요")
+    model = _get_model()
+    result = model(roi_image, conf=_CONFIDENCE_THRESHOLD, verbose=False)[0]
+
+    boxes = []
+    for box in result.boxes:
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        class_id = int(box.cls[0])
+        boxes.append(
+            DetectedBox(
+                x1=x1,
+                y1=y1,
+                x2=x2,
+                y2=y2,
+                part_class=model.names[class_id],
+                confidence=float(box.conf[0]),
+            )
+        )
+    return boxes
