@@ -4,9 +4,9 @@
         Title="PCB AOI 검사 스테이션" Width="1366" Height="800"
         Background="#1E1E1E" Foreground="White" FontSize="16">
 
-    <!-- Space = 검사 -->
     <Window.InputBindings>
         <KeyBinding Key="Space" Command="{Binding InspectCommand}"/>
+        <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenImageCommand}"/>
     </Window.InputBindings>
 
     <Grid>
@@ -23,6 +23,8 @@
         <Border Grid.Row="0" Background="#2D2D2D" Padding="12,8">
             <DockPanel>
                 <TextBlock DockPanel.Dock="Left" Text="{Binding SelectedProduct, StringFormat=제품: {0}}"/>
+                <TextBlock DockPanel.Dock="Left" Text="{Binding ImageDescription}"
+                           Margin="24,0,0,0" Foreground="#9E9E9E"/>
                 <TextBlock DockPanel.Dock="Right" Text="카메라 ● 추론 ● MES ● (연결 표시 예정)" Foreground="#9E9E9E"/>
                 <TextBlock/>
             </DockPanel>
@@ -35,13 +37,11 @@
                 <ColumnDefinition Width="2*"/>
             </Grid.ColumnDefinitions>
 
-            <!-- 왼쪽: 영상 / 결과 이미지 (다음 단계) -->
             <Border Grid.Column="0" Background="Black" BorderBrush="#424242" BorderThickness="1" Margin="0,0,12,0">
                 <TextBlock Text="카메라 영상 / 결과 이미지 영역" Foreground="#757575"
                            HorizontalAlignment="Center" VerticalAlignment="Center"/>
             </Border>
 
-            <!-- 오른쪽: 결과 패널 -->
             <DockPanel Grid.Column="1">
                 <Border DockPanel.Dock="Top" Height="140" CornerRadius="6"
                         Background="{Binding Verdict, Converter={StaticResource VerdictToBrush}}">
@@ -70,11 +70,11 @@
                     <ListView.View>
                         <GridView>
                             <GridViewColumn Header="부품" Width="60" DisplayMemberBinding="{Binding PartId}"/>
-                            <GridViewColumn Header="기대" Width="90" DisplayMemberBinding="{Binding ExpectedClass}"/>
-                            <GridViewColumn Header="탐지" Width="90"
+                            <GridViewColumn Header="기대" Width="110" DisplayMemberBinding="{Binding ExpectedClass}"/>
+                            <GridViewColumn Header="탐지" Width="110"
                                             DisplayMemberBinding="{Binding DetectedClass, TargetNullValue=-}"/>
-                            <GridViewColumn Header="홀" Width="110"
-                                            DisplayMemberBinding="{Binding DetectedHoles, Converter={StaticResource HoleList}}"/>
+                            <GridViewColumn Header="덮인 홀" Width="120"
+                                            DisplayMemberBinding="{Binding CoveredHoles, Converter={StaticResource HoleList}}"/>
                             <GridViewColumn Header="결과" Width="70"
                                             DisplayMemberBinding="{Binding Defect, Converter={StaticResource DefectToText}}"/>
                         </GridView>
@@ -87,7 +87,9 @@
         <Border Grid.Row="2" Background="#2D2D2D" Padding="12">
             <DockPanel>
                 <Button DockPanel.Dock="Left" Content="검사 (Space)" Command="{Binding InspectCommand}"
-                        Focusable="False" Width="220" Height="56" FontSize="20" FontWeight="Bold"/>
+                        Focusable="False" Width="200" Height="56" FontSize="20" FontWeight="Bold"/>
+                <Button DockPanel.Dock="Left" Content="사진 열기 (Ctrl+O)" Command="{Binding OpenImageCommand}"
+                        Focusable="False" Width="180" Height="56" FontSize="16" Margin="12,0,0,0"/>
                 <TextBlock Text="{Binding Message}" Margin="20,0,0,0" FontSize="18"
                            VerticalAlignment="Center" TextWrapping="Wrap"/>
             </DockPanel>
