@@ -28,11 +28,12 @@ _MIN_VALUE = 80
 # (0.5였다가 0.3으로 낮춤: board2.jpg에서 조명이 고르지 않은 레일 선은
 # 채도가 군데군데 끊겨서 50%를 못 넘겼음 — WORKLOG.md 참고)
 _MIN_LINE_HEIGHT_RATIO = 0.3
-# 몇 픽셀 이내면 같은 선(굵기)으로 묶을지.
+# 몇 픽셀 이내면 같은 선(굵기)으로 묶을지. 기준 해상도(scale.py) 기준값이라,
+# 실제 이미지 해상도가 다르면 scale.compute_scale로 비례 조정해서 쓴다.
 _CLUSTER_GAP_PX = 5
 
 
-def _cluster_columns(mask: np.ndarray) -> list[int]:
+def _cluster_columns(mask: np.ndarray, scale: float = 1.0) -> list[int]:
     """마스크(불리언 배열)에서, 세로로 충분히 이어진 열들을 찾아 선의 x좌표로 묶는다."""
     height = mask.shape[0]
     col_counts = mask.sum(axis=0)
@@ -40,21 +41,25 @@ def _cluster_columns(mask: np.ndarray) -> list[int]:
     if len(xs) == 0:
         return []
 
+    gap_px = _CLUSTER_GAP_PX * scale
     groups: list[list[int]] = [[int(xs[0])]]
     for x in xs[1:]:
-        if x - groups[-1][-1] <= _CLUSTER_GAP_PX:
+        if x - groups[-1][-1] <= gap_px:
             groups[-1].append(int(x))
         else:
             groups.append([int(x)])
     return [int(np.mean(g)) for g in groups]
 
 
-def find_rail_lines(image: np.ndarray) -> tuple[list[int], list[int]]:
+def find_rail_lines(image: np.ndarray, scale: float = 1.0) -> tuple[list[int], list[int]]:
     """이미지에서 빨강/파랑 레일 선의 x좌표들을 찾는다 (왼쪽 -> 오른쪽 순).
 
     image: 세로로 자를 구간(대략적인 행 범위)만 담은 배열을 넣는 게 좋다.
     보드 여러 개가 위아래로 겹쳐 있으면, 다른 보드의 레일까지 섞여서
     잡힐 수 있기 때문이다.
+
+    scale: `scale.compute_scale`로 구한 해상도 배율. 기준 해상도(4032×3024)면
+    1.0, 그보다 작은 해상도면 1.0 미만 — 픽셀 기반 임계값을 비례 조정한다.
     """
     hsv = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
     h, s, v = hsv[:, :, 0], hsv[:, :, 1], hsv[:, :, 2]
@@ -62,10 +67,10 @@ def find_rail_lines(image: np.ndarray) -> tuple[list[int], list[int]]:
     red_mask = ((h < _RED_HUE_LOW) | (h > _RED_HUE_HIGH)) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
     blue_mask = (h > _BLUE_HUE_LOW) & (h < _BLUE_HUE_HIGH) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
 
-    return _cluster_columns(red_mask), _cluster_columns(blue_mask)
+    return _cluster_columns(red_mask, scale), _cluster_columns(blue_mask, scale)
 
 
-def find_unit_x_range(image: np.ndarray) -> tuple[int, int]:
+def find_unit_x_range(image: np.ndarray, scale: float = 1.0) -> tuple[int, int]:
     """"레일-단자부-단자부-레일" 한 단위의 x범위(x1, x2)를 찾는다.
 
     x1 = 이 단위를 여는 빨강선, x2 = 이 단위를 닫는(두 번째) 파랑선.
@@ -75,7 +80,7 @@ def find_unit_x_range(image: np.ndarray) -> tuple[int, int]:
     프레임에 보드(또는 단위)가 여러 개 있으면 무조건 제일 왼쪽 것을 고른다.
     "부품이 있는 쪽"을 고르고 싶으면 find_populated_unit_x_range를 쓴다.
     """
-    reds, blues = find_rail_lines(image)
+    reds, blues = find_rail_lines(image, scale)
     if len(reds) < 1 or len(blues) < 2:
         raise ValueError(
             f"레일 선을 충분히 찾지 못했습니다 (빨강={reds}, 파랑={blues}). "
@@ -84,9 +89,9 @@ def find_unit_x_range(image: np.ndarray) -> tuple[int, int]:
     return reds[0], blues[1]
 
 
-def _all_unit_candidates(image: np.ndarray) -> list[tuple[int, int]]:
+def _all_unit_candidates(image: np.ndarray, scale: float = 1.0) -> list[tuple[int, int]]:
     """검출된 레일 선들로 만들 수 있는 모든 "한 단위" 후보 (x1, x2) 목록."""
-    reds, blues = find_rail_lines(image)
+    reds, blues = find_rail_lines(image, scale)
     n = min(len(reds), len(blues) - 1)
     if n < 1:
         raise ValueError(
@@ -102,7 +107,7 @@ def _edge_density(image: np.ndarray, x1: int, x2: int) -> float:
     return float(cv2.Canny(gray, 50, 150).mean())
 
 
-def find_populated_unit_x_range(image: np.ndarray) -> tuple[int, int]:
+def find_populated_unit_x_range(image: np.ndarray, scale: float = 1.0) -> tuple[int, int]:
     """레일 선으로 찾은 후보 단위들 중, 부품이 있을 가능성이 가장 높은 곳을 고른다.
 
     프레임 안에 보드(단위)가 여러 개 있을 때(예: 책상에 여러 개 늘어놓고
@@ -114,15 +119,16 @@ def find_populated_unit_x_range(image: np.ndarray) -> tuple[int, int]:
     실제 검사 라인(보드 하나만 지그에 고정)에서는 후보가 하나뿐이라
     find_unit_x_range와 결과가 같다 — 즉 상위 호환이라 이 함수를 기본으로 써도 된다.
     """
-    candidates = _all_unit_candidates(image)
+    candidates = _all_unit_candidates(image, scale)
     return max(candidates, key=lambda xy: _edge_density(image, *xy))
 
 
-def _line_angle(mask: np.ndarray, x_center: int, margin: int = 15) -> float | None:
-    """mask에서 x_center 근방(폭 margin*2)의 픽셀들로 그 선의 실제 기울기를 잰다.
+def _line_angle(mask: np.ndarray, x_center: int, scale: float = 1.0) -> float | None:
+    """mask에서 x_center 근방의 픽셀들로 그 선의 실제 기울기를 잰다.
 
     수직에서 벗어난 각도(도, 시계 방향 양수)를 반환. 픽셀이 너무 적으면 None.
     """
+    margin = max(1, round(15 * scale))
     lo, hi = max(0, x_center - margin), x_center + margin
     ys, xs = np.where(mask[:, lo:hi])
     if len(ys) < 50:
@@ -135,7 +141,7 @@ def _line_angle(mask: np.ndarray, x_center: int, margin: int = 15) -> float | No
     return float(np.degrees(np.arctan(a)))
 
 
-def measure_tilt_angle(image: np.ndarray, x1: int, x2: int) -> float:
+def measure_tilt_angle(image: np.ndarray, x1: int, x2: int, scale: float = 1.0) -> float:
     """선택된 단위의 두 경계 레일 선(x1=빨강, x2=파랑)으로 실제 기울기를 측정한다.
 
     90도 회전은 "카메라가 눕혀서 찍혔다"는 큰 방향만 바로잡을 뿐, 카메라
@@ -153,13 +159,13 @@ def measure_tilt_angle(image: np.ndarray, x1: int, x2: int) -> float:
     red_mask = ((h < _RED_HUE_LOW) | (h > _RED_HUE_HIGH)) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
     blue_mask = (h > _BLUE_HUE_LOW) & (h < _BLUE_HUE_HIGH) & (s > _MIN_SATURATION) & (v > _MIN_VALUE)
 
-    angles = [a for a in (_line_angle(red_mask, x1), _line_angle(blue_mask, x2)) if a is not None]
+    angles = [a for a in (_line_angle(red_mask, x1, scale), _line_angle(blue_mask, x2, scale)) if a is not None]
     if not angles:
         raise ValueError("기울기를 측정할 레일 선 픽셀이 부족합니다.")
     return float(np.mean(angles))
 
 
-def find_center_unit_x_range(image: np.ndarray) -> tuple[int, int]:
+def find_center_unit_x_range(image: np.ndarray, scale: float = 1.0) -> tuple[int, int]:
     """레일 선으로 찾은 후보 단위들 중, 프레임 중앙에 가장 가까운 것을 고른다.
 
     실제 검사 라인은 카메라·지그가 고정되어 있어서, 검사 대상 보드는 항상
@@ -174,7 +180,7 @@ def find_center_unit_x_range(image: np.ndarray) -> tuple[int, int]:
     실제 검사 라인(보드 하나만 지그에 고정)에서는 후보가 하나뿐이라
     find_unit_x_range와 결과가 같다.
     """
-    candidates = _all_unit_candidates(image)
+    candidates = _all_unit_candidates(image, scale)
     frame_center = image.shape[1] / 2
 
     def _distance_to_center(xy: tuple[int, int]) -> float:

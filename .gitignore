@@ -370,6 +370,7 @@ inference/**/*.jpg
 inference/**/*.jpeg
 inference/**/*.png
 inference/**/*.pt
+inference/**/*.pth
 inference/**/*.onnx
 
 .venv/
