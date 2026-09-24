@@ -369,7 +369,9 @@ FodyWeavers.xsd
 inference/**/*.jpg
 inference/**/*.jpeg
 inference/**/*.png
+!inference/training/rtmdet/metrics/confusion_matrix.png
 inference/**/*.pt
+inference/**/*.pth
 inference/**/*.onnx
 
 .venv/
