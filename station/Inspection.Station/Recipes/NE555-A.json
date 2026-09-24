@@ -1,143 +1,67 @@
 {
   "productId": "NE555-A",
-  "version": 1,
+  "version": 3,
+  "note": "2026-09-24 티칭: 정답 보드를 /infer에 넣어 나온 '박스에 덮인 홀'을 그대로 레시피로 사용. 손으로 적은 v2(꽂힌 홀 기준)와 정의가 달라 판정이 어긋났기 때문.",
   "parts": [
-    {
-      "partId": "LED1",
-      "expectedClass": "led",
-      "holes": [
-        "D7",
-        "E7"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "W1",
-      "expectedClass": "black_wire",
-      "holes": [
-        "D9",
-        "D10",
-        "D11",
-        "D12",
-        "D13"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "R1",
-      "expectedClass": "resistance_480",
-      "holes": [
-        "E9",
-        "F9",
-        "G9",
-        "H9"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "W2",
-      "expectedClass": "red_wire",
-      "holes": [
-        "H0",
-        "H1",
-        "H2"
-      ],
-      "expectedPinSide": null
-    },
     {
       "partId": "U1",
       "expectedClass": "ic_chip",
-      "holes": [
-        "H6",
-        "H7",
-        "I6",
-        "I7",
-        "J6",
-        "J7",
-        "K6",
-        "K7",
-        "L6",
-        "L7",
-        "M6",
-        "M7",
-        "N6",
-        "N7"
-      ],
-      "expectedPinSide": null
+      "holes": [ "G6", "G7", "H6", "H7", "I6", "I7", "J6", "J7", "K6", "K7", "L6", "L7", "M6", "M7", "N6", "N7" ]
+    },
+    {
+      "partId": "R1",
+      "expectedClass": "resistance330",
+      "holes": [ "E9", "F9", "G9", "H9" ]
+    },
+    {
+      "partId": "R2",
+      "expectedClass": "resistance330",
+      "holes": [ "N3", "O3", "P3", "Q3" ]
+    },
+    {
+      "partId": "R3",
+      "expectedClass": "resistance330",
+      "holes": [ "N8", "O8", "P8", "Q8" ]
+    },
+    {
+      "partId": "C1",
+      "expectedClass": "capacitor",
+      "holes": [ "Q9", "Q10" ]
+    },
+    {
+      "partId": "LED1",
+      "expectedClass": "led",
+      "holes": [ "D2", "D3" ]
+    },
+    {
+      "partId": "W1",
+      "expectedClass": "red_wire",
+      "holes": [ "N0", "N1", "N2" ]
+    },
+    {
+      "partId": "W2",
+      "expectedClass": "white_wire",
+      "holes": [ "M4", "N4", "O4", "P4", "Q4" ]
     },
     {
       "partId": "W3",
       "expectedClass": "black_wire",
-      "holes": [
-        "J10",
-        "J11",
-        "J12",
-        "J13"
-      ],
-      "expectedPinSide": null
+      "holes": [ "D9", "D10", "D11", "D12", "D13" ]
     },
     {
       "partId": "W4",
-      "expectedClass": "red_wire",
-      "holes": [
-        "N0",
-        "N1",
-        "N2"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "R2",
-      "expectedClass": "resistance_330",
-      "holes": [
-        "N3",
-        "O3",
-        "P3",
-        "Q3"
-      ],
-      "expectedPinSide": null
+      "expectedClass": "black_wire",
+      "holes": [ "H11", "I11", "J11", "K11", "L11", "M11" ]
     },
     {
       "partId": "W5",
-      "expectedClass": "white_wire",
-      "holes": [
-        "M4",
-        "N4",
-        "O4",
-        "P4",
-        "Q4"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "R3",
-      "expectedClass": "resistance_330",
-      "holes": [
-        "N8",
-        "O8",
-        "P8",
-        "Q8"
-      ],
-      "expectedPinSide": null
-    },
-    {
-      "partId": "D1",
-      "expectedClass": "diode",
-      "holes": [
-        "Q10",
-        "R10"
-      ],
-      "expectedPinSide": null
+      "expectedClass": "black_wire",
+      "holes": [ "J0", "J1", "J2" ]
     },
     {
       "partId": "W6",
       "expectedClass": "black_wire",
-      "holes": [
-        "R11",
-        "R12",
-        "R13"
-      ],
-      "expectedPinSide": null
+      "holes": [ "R12", "R13" ]
     }
   ]
 }
