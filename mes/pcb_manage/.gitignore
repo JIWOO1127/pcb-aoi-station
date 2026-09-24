@@ -1,5 +1,8 @@
 HELP.md
 .gradle
+.gradle-user-home/
+.jdk17/
+.jdk17.zip
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
