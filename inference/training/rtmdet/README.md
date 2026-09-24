@@ -31,6 +31,21 @@ Roboflow COCO 데이터셋의 8개 부품/배선 클래스를 RTMDet-m으로 학
 
 기존 노트북 실행 기록에서 100 epoch 검증 COCO bbox mAP(0.50:0.95)는 **0.661**, 8장 테스트셋의 bbox mAP는 **0.744**였습니다. 이 값은 저장된 과거 실행 결과이며, 정리한 노트북을 새 `config.py`로 다시 실행해 얻은 값은 아닙니다.
 
+## 22장 테스트셋 평가 결과
+
+`inference/dataset/22Circuit testing 2 -test.coco/test/`의 22장, 155개 객체를 confidence 0.5와 IoU 0.5 기준으로 평가했습니다. Accuracy는 객체 탐지 특성에 맞춰 `TP / (TP + FP + FN)`으로 계산했습니다.
+
+| 지표 | Micro average | Macro average |
+| --- | ---: | ---: |
+| Accuracy | 0.6513 | 0.6723 |
+| Precision | 0.7605 | 0.7740 |
+| Recall | 0.8194 | 0.8220 |
+| F1-score | 0.7888 | 0.7631 |
+
+RTX 4050 Laptop GPU에서 batch size 1, 워밍업 3회 후 측정한 end-to-end 평균 처리시간은 **153.71 ms/image**, 중앙값은 **138.96 ms/image**, P95는 **190.90 ms/image**, 처리량은 **6.51 FPS**였습니다. 이미지 로딩, 전처리, 추론 및 후처리를 포함한 값입니다.
+
+상세 클래스별 지표는 `metrics/detection_metrics.json`, 혼동행렬과 정규화 heatmap은 `metrics/confusion_matrix.png`에 있습니다. `test.ipynb`를 다시 실행하면 두 파일이 갱신됩니다.
+
 ## Git에 올릴 때
 
 `.gitignore`는 `inference/dataset/`, 가상환경, `configs/`, `test_outputs/`, 생성된 `outputs/`와 체크포인트를 제외합니다. 데이터셋과 모델 가중치는 별도로 공유받아 위에 적힌 경로에 배치하세요.
