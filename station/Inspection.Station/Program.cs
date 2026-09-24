@@ -10,7 +10,7 @@ builder.Services.AddHttpClient<IInferenceClient, InferenceClient>(client =>
 {
     var baseUrl = builder.Configuration["InferenceService:BaseUrl"] ?? "http://localhost:8001";
     client.BaseAddress = new Uri(baseUrl);
-    client.Timeout = TimeSpan.FromSeconds(10);
+    client.Timeout = TimeSpan.FromSeconds(20);
 });
 
 // 레시피(정답지) 공급. 지금은 JSON 파일, MES 준비되면 MesRecipeProvider로 교체.

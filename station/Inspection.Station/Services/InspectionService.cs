@@ -10,6 +10,13 @@ namespace Inspection.Station.Services;
 /// </summary>
 public class InspectionService
 {
+    /// <summary>
+    /// 이 신뢰도 미만인 탐지는 판정에서 뺀다.
+    /// Camo 실측: 같은 LED를 한 칸 옆에서 중복으로 잡은 박스가 0.31,
+    /// 정상 부품 중 가장 낮은 것이 R3의 0.64라서 그 사이인 0.5로 둔다.
+    /// </summary>
+    private const double MinConfidence = 0.5;
+
     private readonly IInferenceClient _inference;
     private readonly IRecipeProvider _recipes;
     private readonly ILogger<InspectionService> _log;
@@ -45,10 +52,17 @@ public class InspectionService
                 "INFERENCE_UNAVAILABLE");
         }
 
-        // 3. 응답을 Contracts 형식으로 변환 (잘못된 홀 라벨은 버린다)
+        // 3. 응답을 Contracts 형식으로 변환 (신뢰도 낮은 탐지·잘못된 홀 라벨은 버린다)
         var detections = new List<HoleDetection>();
         foreach (var p in infer.Parts)
         {
+            if (p.Confidence < MinConfidence)
+            {
+                _log.LogInformation("낮은 신뢰도 탐지 제외: {Pinhole} {Class} {Confidence:F2}",
+                    p.Pinhole, p.Class, p.Confidence);
+                continue;
+            }
+
             var hole = Hole.Parse(p.Pinhole);
             if (hole is null || !hole.IsValid())
             {
