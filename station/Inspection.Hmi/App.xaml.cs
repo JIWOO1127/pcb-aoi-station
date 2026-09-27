@@ -29,6 +29,9 @@ public partial class App : Application
                 services.AddSingleton<SwitchableImageSource>();
                 services.AddSingleton<IImageSource>(sp => sp.GetRequiredService<SwitchableImageSource>());
 
+                // 로그인한 작업자 (검사 요청에 사번을 붙이고, 오프라인 로그인 정보를 저장)
+                services.AddSingleton<WorkerSession>();
+
                 // 스테이션 서버 호출.
                 // 서버 없이 화면만 보려면 아래 두 줄을 주석 처리하고
                 // services.AddSingleton<IStationClient, MockStationClient>(); 를 쓴다.

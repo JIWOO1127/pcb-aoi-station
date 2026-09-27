@@ -45,6 +45,8 @@ public partial class MainViewModel : ObservableObject
 {
     private readonly IStationClient _client;
     private readonly SwitchableImageSource _input;
+    private readonly WorkerSession _session;
+    private readonly bool _requireLogin;     // true면 로그인해야 검사할 수 있다 (Hmi:RequireLogin)
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _passTimer;
 
@@ -64,10 +66,13 @@ public partial class MainViewModel : ObservableObject
     private List<PartResult>? _prevDefects; // 같은 보드의 직전 FAIL 불량 (재검사 비교용)
     private string _lastSummary = "";       // 다음 검사 때 "직전 ..."으로 보여줄 요약
 
-    public MainViewModel(IStationClient client, SwitchableImageSource input, IConfiguration config)
+    public MainViewModel(IStationClient client, SwitchableImageSource input, WorkerSession session,
+        IConfiguration config)
     {
         _client = client;
         _input = input;
+        _session = session;
+        _requireLogin = config.GetValue("Hmi:RequireLogin", true);
         _ui = Application.Current.Dispatcher;
 
         _maxCameraIndex = config.GetValue("Camera:MaxIndex", 4);
@@ -110,6 +115,31 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private int latencyMs;
     [ObservableProperty] private PartResult? selectedPart;
 
+    // ── 로그인 ──────────────────────────────────────────────
+    [ObservableProperty] private string loginEmployeeId = "";
+    [ObservableProperty] private string loginMessage = "";
+    [ObservableProperty] private LoginResult? currentWorker;
+    [ObservableProperty] private bool isLoggingIn;
+
+    public bool IsLoggedIn => CurrentWorker is not null;
+
+    /// <summary>로그인 화면을 덮어 보여줄지. 로그인하지 않아도 되는 설정이면 보이지 않는다.</summary>
+    public bool ShowLoginOverlay => _requireLogin && !IsLoggedIn;
+
+    /// <summary>헤더 표시: "작업자 홍길동 (A-1042)", MES가 꺼진 채 로그인했으면 "· 오프라인"</summary>
+    public string WorkerText => CurrentWorker is { } w
+        ? $"작업자 {w.Name} ({w.EmployeeId}){(w.Offline ? " · 오프라인" : "")}"
+        : "";
+
+    partial void OnCurrentWorkerChanged(LoginResult? value)
+    {
+        OnPropertyChanged(nameof(IsLoggedIn));
+        OnPropertyChanged(nameof(ShowLoginOverlay));
+        OnPropertyChanged(nameof(WorkerText));
+        InspectCommand.NotifyCanExecuteChanged();
+        LogoutCommand.NotifyCanExecuteChanged();
+    }
+
     public ObservableCollection<PartResult> Parts { get; } = new();
     public ObservableCollection<BoardCell> BoardCells { get; } = new();
     public ObservableCollection<BoardPart> BoardParts { get; } = new();
@@ -128,6 +158,7 @@ public partial class MainViewModel : ObservableObject
         NextCameraCommand.NotifyCanExecuteChanged();
         UseCameraCommand.NotifyCanExecuteChanged();
         OpenImageCommand.NotifyCanExecuteChanged();
+        LogoutCommand.NotifyCanExecuteChanged();
         RaisePanelChanged();
     }
 
@@ -234,7 +265,7 @@ public partial class MainViewModel : ObservableObject
 
     // ── 검사 ────────────────────────────────────────────────
 
-    private bool CanInspect() => State != ScreenState.Busy;
+    private bool CanInspect() => State != ScreenState.Busy && (!_requireLogin || IsLoggedIn);
 
     [RelayCommand(CanExecute = nameof(CanInspect))]
     private async Task InspectAsync()
@@ -487,6 +518,79 @@ public partial class MainViewModel : ObservableObject
 
     private static string WithDirection(string word) =>
         word + (HasFinalConsonant(word) && !EndsWithRieul(word) ? "으로" : "로");
+
+    // ── 로그인 / 로그아웃 ────────────────────────────────────
+
+    /// <summary>
+    /// 사번 + PIN 로그인. PIN은 보안상 바인딩하지 않고 PasswordBox를 직접 받아 읽은 뒤 바로 지운다.
+    /// 1) 스테이션을 거쳐 MES에 로그인 → 성공하면 이 PC에 오프라인용 해시 저장
+    /// 2) MES나 스테이션에 연결할 수 없으면 저장된 해시로 오프라인 로그인
+    /// </summary>
+    [RelayCommand]
+    private async Task LoginAsync(object? parameter)
+    {
+        if (IsLoggingIn) return;
+        var box = parameter as System.Windows.Controls.PasswordBox;
+        string id = LoginEmployeeId.Trim();
+        string pin = box?.Password ?? "";
+
+        if (id.Length == 0 || pin.Length == 0)
+        {
+            LoginMessage = "사번과 PIN을 입력하세요.";
+            return;
+        }
+
+        IsLoggingIn = true;
+        LoginMessage = "로그인 중...";
+        try
+        {
+            var outcome = await _client.LoginAsync(id, pin);
+            switch (outcome.Status)
+            {
+                case LoginStatus.Ok when outcome.Worker is not null:
+                    if (!outcome.Worker.Offline) _session.Remember(id, pin, outcome.Worker);
+                    SignIn(outcome.Worker);
+                    break;
+
+                case LoginStatus.InvalidCredentials:
+                    LoginMessage = outcome.Message ?? "사번 또는 PIN이 올바르지 않습니다.";
+                    break;
+
+                default:
+                    // MES(또는 스테이션)가 안 될 때: 전에 로그인한 적 있는 작업자면 저장된 정보로
+                    var offline = _session.TryOffline(id, pin);
+                    if (offline is not null) SignIn(offline);
+                    else LoginMessage = $"{outcome.Message} 이 PC에서 로그인한 적이 없는 작업자는 오프라인 로그인을 할 수 없습니다.";
+                    break;
+            }
+        }
+        finally
+        {
+            box?.Clear();
+            IsLoggingIn = false;
+        }
+    }
+
+    private void SignIn(LoginResult worker)
+    {
+        _session.SignIn(worker);
+        CurrentWorker = worker;
+        LoginEmployeeId = "";
+        LoginMessage = "";
+        GoIdle();
+    }
+
+    private bool CanLogout() => IsLoggedIn && State != ScreenState.Busy;
+
+    [RelayCommand(CanExecute = nameof(CanLogout))]
+    private void Logout()
+    {
+        _session.SignOut();
+        CurrentWorker = null;
+        LastResultNote = "";
+        _lastSummary = "";
+        GoIdle();
+    }
 
     // ── 입력 (카메라 / 사진) ─────────────────────────────────
     private bool NotBusy() => State != ScreenState.Busy;

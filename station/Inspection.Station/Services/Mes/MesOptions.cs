@@ -3,11 +3,14 @@ namespace Inspection.Station.Services.Mes;
 /// <summary>appsettings.json의 "Mes" 섹션.</summary>
 public class MesOptions
 {
-    /// <summary>false면 MES로 보내지도, 쌓지도 않는다 (MES 없이 개발할 때).</summary>
+    /// <summary>false면 검사 기록을 MES로 보내지도, 쌓지도 않는다 (MES 없이 개발할 때). 로그인은 이 값과 무관하게 BaseUrl로 시도한다.</summary>
     public bool Enabled { get; set; } = false;
 
     /// <summary>MES 주소. 같은 노트북이면 http://localhost:8080, 다른 노트북이면 그 IP.</summary>
     public string BaseUrl { get; set; } = "http://localhost:8080";
+
+    /// <summary>작업자 로그인 API 경로 (MES MVP-26).</summary>
+    public string LoginPath { get; set; } = "/api/auth/login";
 
     /// <summary>검사 기록을 받는 API 경로 (MES 담당자와 확정 후 맞춘다).</summary>
     public string InspectionsPath { get; set; } = "/api/inspections";

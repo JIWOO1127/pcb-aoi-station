@@ -38,6 +38,14 @@
                            Margin="22,0,0,0" FontSize="13" Foreground="#757575" VerticalAlignment="Center"/>
 
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- 로그인한 작업자 + 로그아웃 -->
+                    <TextBlock Text="{Binding WorkerText}" Foreground="#E0E0E0" FontSize="14"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource HmiButton}" Content="로그아웃"
+                            Command="{Binding LogoutCommand}"
+                            Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibility}}"
+                            Width="70" Height="26" FontSize="12" Background="#3A3A3A" Foreground="#9E9E9E"
+                            Margin="0,0,22,0"/>
                     <Ellipse Width="11" Height="11" Margin="0,0,5,0"
                              Fill="{Binding CameraOk, Converter={StaticResource StatusToBrush}}"/>
                     <TextBlock Text="카메라" Foreground="#9E9E9E" FontSize="13" Margin="0,0,14,0"/>
@@ -268,5 +276,41 @@
                 <TextBlock/>
             </DockPanel>
         </Border>
+
+        <!--
+          로그인 화면: 본문과 조작바를 덮는다. 로그인하면 사라진다 (Hmi:RequireLogin=false면 처음부터 안 보임).
+          PIN은 보안상 바인딩하지 않고 PasswordBox를 그대로 명령에 넘긴다.
+        -->
+        <Grid Grid.Row="1" Grid.RowSpan="2" Background="#E61E1E1E" FocusManager.FocusedElement="{Binding ElementName=EmployeeIdBox}"
+              Visibility="{Binding ShowLoginOverlay, Converter={StaticResource BoolToVisibility}}">
+            <Border Width="420" Background="#2D2D2D" CornerRadius="8" Padding="32,28"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="작업자 로그인" FontSize="28" FontWeight="Bold" Margin="0,0,0,20"/>
+
+                    <TextBlock Text="사번" Foreground="#9E9E9E" FontSize="14"/>
+                    <TextBox x:Name="EmployeeIdBox" Text="{Binding LoginEmployeeId, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="22" Height="44" Padding="8,4" Margin="0,4,0,14"
+                             Background="#1E1E1E" Foreground="White" BorderBrush="#555" CaretBrush="White"/>
+
+                    <TextBlock Text="PIN" Foreground="#9E9E9E" FontSize="14"/>
+                    <PasswordBox x:Name="PinBox" FontSize="22" Height="44" Padding="8,4" Margin="0,4,0,18"
+                                 Background="#1E1E1E" Foreground="White" BorderBrush="#555" CaretBrush="White">
+                        <PasswordBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding LoginCommand}"
+                                        CommandParameter="{Binding ElementName=PinBox}"/>
+                        </PasswordBox.InputBindings>
+                    </PasswordBox>
+
+                    <Button Style="{StaticResource HmiButton}" Content="로그인 (Enter)"
+                            Command="{Binding LoginCommand}" CommandParameter="{Binding ElementName=PinBox}"
+                            Height="52" FontSize="20" Background="#1565C0"/>
+
+                    <TextBlock Text="{Binding LoginMessage}" Foreground="#FFB74D" FontSize="14"
+                               TextWrapping="Wrap" Margin="0,14,0,0"
+                               Visibility="{Binding LoginMessage, Converter={StaticResource EmptyToVisibility}}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>

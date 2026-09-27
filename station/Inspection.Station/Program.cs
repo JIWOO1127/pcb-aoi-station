@@ -32,6 +32,14 @@ builder.Services.AddHttpClient("Mes", (sp, client) =>
     client.DefaultRequestHeaders.Add("X-Station-Key", o.StationKey);
 });
 
+// 작업자 로그인: HMI → 스테이션 /api/login → MES /api/auth/login
+builder.Services.AddHttpClient<MesAuthClient>((sp, client) =>
+{
+    var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MesOptions>>().Value;
+    client.BaseAddress = new Uri(o.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+});
+
 var app = builder.Build();
 
 if (app.Environment.IsDevelopment())
