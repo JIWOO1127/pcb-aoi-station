@@ -8,13 +8,14 @@
 이 서비스는 절대 판정하지 않는다. (docs/api-contract.md 참고)
 """
 
+import base64
 import os
 from pathlib import Path
 from typing import List
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from ultralytics import YOLO
 
@@ -40,8 +41,40 @@ class PartResult(BaseModel):
     confidence: float  # 0~1
 
 
+class OverlayPinhole(BaseModel):
+    pinhole: str  # 핀홀 라벨 (예: "J9")
+    x: float  # 크롭된 이미지 기준 픽셀 x좌표
+    y: float  # 크롭된 이미지 기준 픽셀 y좌표
+
+
+class OverlayBox(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    part_class: str = Field(alias="class")  # YOLO가 탐지한 부품 종류
+    confidence: float  # 0~1
+    x1: float  # 크롭된 이미지 기준 픽셀 좌표
+    y1: float
+    x2: float
+    y2: float
+
+
+class InferOverlay(BaseModel):
+    """/infer?overlay=true 일 때만 붙는 시각 확인용 정보. 좌표는 모두 imageJpeg 기준."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    width: int  # 크롭된 이미지(roi_image) 가로 픽셀
+    height: int  # 크롭된 이미지 세로 픽셀
+    image_jpeg: str = Field(alias="imageJpeg")  # 크롭된 이미지, JPEG(품질 90) base64
+    pinholes: List[OverlayPinhole]  # 핀홀 282개 전부의 기대 픽셀 위치
+    boxes: List[OverlayBox]  # YOLO 탐지 박스 전부
+
+
 class InferResponse(BaseModel):
     parts: List[PartResult]
+    # overlay=true일 때만 채운다. 비어 있으면 응답 JSON에 아예 나오지 않는다
+    # (/infer의 response_model_exclude_unset) → overlay=false 응답은 예전과 같다.
+    overlay: InferOverlay | None = None
 
 
 class DebugPinhole(BaseModel):
@@ -59,16 +92,51 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/infer", response_model=InferResponse)
-async def infer(image: UploadFile = File(...)) -> InferResponse:
+@app.post("/infer", response_model=InferResponse, response_model_exclude_unset=True)
+async def infer(
+    image: UploadFile = File(...),
+    overlay: bool = Query(False, description="true면 크롭 이미지·핀홀 좌표·YOLO 박스를 함께 반환"),
+) -> InferResponse:
     if image.content_type != "image/jpeg":
         raise HTTPException(
             status_code=415, detail="image는 JPEG(image/jpeg)만 지원합니다."
         )
 
     image_bytes = await image.read()
-    parts = run_inference(image_bytes)
-    return InferResponse(parts=parts)
+    if not overlay:
+        parts = run_inference(image_bytes)
+        return InferResponse(parts=parts)
+
+    # overlay: run_inference와 같은 단계를 한 번만 돌리고, 중간 결과(크롭 이미지·
+    # 핀홀·박스)를 응답에 함께 싣는다.
+    decoded = _decode_image(image_bytes)
+    roi_image, img_scale, label_anchors = crop_to_roi(decoded)
+    _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
+    boxes = detect_parts(roi_image)
+    match_holes_to_boxes(holes, boxes)
+
+    parts = [
+        PartResult(pinhole=hole.label, part_class=hole.part_class, confidence=hole.confidence)
+        for hole in holes
+        if hole.covered
+    ]
+    ok, jpeg = cv2.imencode(".jpg", roi_image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    if not ok:
+        raise HTTPException(status_code=500, detail="크롭 이미지를 JPEG로 인코딩할 수 없습니다.")
+
+    return InferResponse(
+        parts=parts,
+        overlay=InferOverlay(
+            width=roi_image.shape[1],
+            height=roi_image.shape[0],
+            image_jpeg=base64.b64encode(jpeg.tobytes()).decode("ascii"),
+            pinholes=[OverlayPinhole(pinhole=h.label, x=h.pixel[0], y=h.pixel[1]) for h in holes],
+            boxes=[
+                OverlayBox(part_class=b.part_class, confidence=b.confidence, x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2)
+                for b in boxes
+            ],
+        ),
+    )
 
 
 @app.post("/infer/debug", response_model=InferDebugResponse)
