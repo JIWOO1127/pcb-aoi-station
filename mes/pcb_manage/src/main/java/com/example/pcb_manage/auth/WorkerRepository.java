@@ -15,7 +15,7 @@ public class WorkerRepository {
 
     public Optional<WorkerAccount> findById(String workerId) {
         return jdbcClient.sql("""
-                        SELECT worker_id, name, pin_hash, role, active
+                        SELECT worker_id, name, pin_hash, COALESCE(admin_role, role) AS role, active
                         FROM worker WHERE worker_id = :workerId
                         """)
                 .param("workerId", workerId)
