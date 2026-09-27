@@ -383,7 +383,10 @@ public partial class MainViewModel : ObservableObject
 
     private void BuildDefectCards(List<PartResult> defects, HashSet<string> newIds)
     {
-        const int maxCards = 3;
+        // 카드 칸은 최대 3장 높이. 불량이 3건 이하면 전부 카드로,
+        // 4건 이상이면 2장 + "외 N건" 요약 1장으로 3장을 넘지 않게 한다 (4장째가 잘려 보이던 문제).
+        // 보드 위 번호 배지와 아래 목록에는 모든 불량이 그대로 나온다.
+        int maxCards = defects.Count <= 3 ? 3 : 2;
 
         for (int i = 0; i < Math.Min(defects.Count, maxCards); i++)
         {
@@ -401,8 +404,9 @@ public partial class MainViewModel : ObservableObject
             DefectCards.Add(new DefectCard(
                 Badge: "+",
                 Title: $"외 {defects.Count - maxCards}건",
-                Detail: string.Join(", ", defects.Skip(maxCards).Select(p => p.PartId)),
-                Action: "아래 목록에서 확인하세요"));
+                Detail: string.Join(", ", defects.Skip(maxCards)
+                    .Select((p, k) => $"{maxCards + k + 1}번 {p.PartId} {DescribeDefect(p.Defect)}")),
+                Action: "보드 위 번호와 아래 목록에서 확인하세요"));
         }
     }
 
