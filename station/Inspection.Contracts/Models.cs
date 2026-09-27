@@ -54,5 +54,7 @@ public record PartResult(string PartId, string ExpectedClass, List<Hole> Expecte
     string? DetectedClass, List<Hole> CoveredHoles, DefectType? Defect, Verdict Verdict);
 
 /// <summary>보드 한 장의 검사 결과.</summary>
+/// <param name="Overlay">실제 사진 위에 그릴 정보. 추론 서비스가 주지 않았거나 판정 불가면 null</param>
 public record InspectionResult(Guid InspectionId, Verdict Verdict, int DefectCount,
-    List<PartResult> Parts, string? ImageUrl, int LatencyMs, string? ErrorCode);
+    List<PartResult> Parts, string? ImageUrl, int LatencyMs, string? ErrorCode,
+    InspectionOverlay? Overlay = null);

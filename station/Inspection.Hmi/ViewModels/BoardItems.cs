@@ -92,6 +92,53 @@ public record BoardPart(string PartId, double X, double Y, double Width, double 
     }
 }
 
+/// <summary>
+/// 실제 사진 위에 불량을 그릴 때 쓰는 부품 표시 계산.
+/// 미니어처와 같은 BoardPart를 만들되, 좌표는 BoardLayout 대신 추론 서비스가 준 구멍 픽셀 위치로 계산한다.
+/// 그래서 동작 표시(꽂기·교체·빼기·옮기기)와 번호 배지를 사진과 미니어처에서 똑같이 쓸 수 있다.
+/// </summary>
+public static class PhotoLayout
+{
+    /// <param name="locate">구멍 → 화면 좌표 (없으면 null)</param>
+    /// <param name="pad">구멍 중심에서 바깥으로 넓힐 여백 (보통 구멍 간격의 절반)</param>
+    public static BoardPart? From(PartResult p, int defectIndex, Func<Hole, (double X, double Y)?> locate,
+        double pad, double dotSize, Func<DefectType?, string> describe, Func<string?, string> korean)
+    {
+        var holes = p.ExpectedHoles.Count > 0 ? p.ExpectedHoles : p.CoveredHoles;
+        var points = holes.Select(locate).Where(v => v is not null).Select(v => v!.Value).ToList();
+        if (points.Count == 0) return null;
+
+        double left = points.Min(v => v.X) - pad;
+        double top = points.Min(v => v.Y) - pad;
+        double width = points.Max(v => v.X) + pad - left;
+        double height = points.Max(v => v.Y) + pad - top;
+
+        var kind = BoardPart.KindOf(p.Defect);
+        string badge = defectIndex >= 0 ? (defectIndex + 1).ToString() : "";
+        string label = kind == PartShapeKind.Normal ? p.PartId : BoardPart.VerbOf(kind);
+
+        var dots = new List<HoleDot>();
+        if (kind == PartShapeKind.Move)
+        {
+            foreach (var h in p.CoveredHoles)
+                if (locate(h) is { } c)
+                    dots.Add(new HoleDot(c.X - left - dotSize / 2, c.Y - top - dotSize / 2, dotSize));
+        }
+
+        string tooltip = $"{p.PartId} · {describe(p.Defect)}\n"
+                       + $"있어야 할 것: {korean(p.ExpectedClass)}\n"
+                       + $"탐지된 것: {korean(p.DetectedClass)}\n"
+                       + $"홀: {string.Join(", ", holes)}";
+
+        string cls = p.ExpectedClass is "-" or "" ? (p.DetectedClass ?? "") : p.ExpectedClass;
+        return new BoardPart(p.PartId, left, top, width, height, kind, badge, label, tooltip, dots, cls,
+            height > width ? 90 : 0);
+    }
+}
+
+/// <summary>"모델이 본 것" 보기에서 그리는 YOLO 박스 하나 (화면 좌표).</summary>
+public record ModelBox(double X, double Y, double Width, double Height, string Label, string Color);
+
 /// <summary>사유 영역에 표시할 불량 한 건.</summary>
 /// <param name="Badge">보드 위 번호와 같은 값</param>
 /// <param name="Title">"R1 누락" — 무엇이 문제인가 (재검사에서 새로 생긴 불량이면 표시가 붙는다)</param>

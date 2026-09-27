@@ -76,9 +76,11 @@ public class InspectionService
         var parts = InspectionRules.Judge(recipe.Parts, detections);
         int defectCount = parts.Count(p => p.Defect is not null);
 
+        // 추론 서비스가 정렬된 사진·좌표를 줬으면 HMI가 실제 사진 위에 그린다 (없으면 null → 미니어처)
         return new InspectionResult(
             inspectionId,
             defectCount == 0 ? Verdict.Pass : Verdict.Fail,
-            defectCount, parts, null, (int)sw.ElapsedMilliseconds, null);
+            defectCount, parts, null, (int)sw.ElapsedMilliseconds, null,
+            Overlay: infer.Overlay);
     }
 }

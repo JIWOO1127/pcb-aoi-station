@@ -75,9 +75,22 @@
                     BorderBrush="#424242" BorderThickness="1" ClipToBounds="True"
                     Width="{Binding ActualHeight, RelativeSource={RelativeSource Self}}">
                 <Grid>
-                    <!-- ① 보드 표시 (PASS·FAIL) -->
+                    <!-- ① 보드 표시 (PASS·FAIL): 실제 사진 위 표시가 있으면 사진, 없으면 미니어처 -->
+                    <ctrl:PhotoOverlay Margin="10"
+                        Visibility="{Binding ShowPhoto, Converter={StaticResource BoolToVisibility}}"/>
                     <ctrl:BoardMiniature Margin="10"
-                        Visibility="{Binding ShowBoard, Converter={StaticResource BoolToVisibility}}"/>
+                        Visibility="{Binding ShowMiniature, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- 사진 / 배치도 전환, 모델이 본 것 (사진 정보가 있을 때만) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
+                                Visibility="{Binding ShowViewToggle, Converter={StaticResource BoolToVisibility}}">
+                        <Button Style="{StaticResource HmiButton}" Content="모델이 본 것"
+                                Command="{Binding ToggleModelBoxesCommand}"
+                                Width="96" Height="30" FontSize="12" Background="#CC3A3A3A" Margin="0,0,6,0"/>
+                        <Button Style="{StaticResource HmiButton}" Content="{Binding ViewToggleText}"
+                                Command="{Binding ToggleViewCommand}"
+                                Width="96" Height="30" FontSize="12" Background="#CC3A3A3A"/>
+                    </StackPanel>
 
                     <!-- ② 사진 (실시간 / 검사한 사진). 카메라일 때는 가이드 주변만 잘라서 온다 -->
                     <Viewbox Stretch="Uniform"

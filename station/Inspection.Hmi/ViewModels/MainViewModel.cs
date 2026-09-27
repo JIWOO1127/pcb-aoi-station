@@ -140,6 +140,98 @@ public partial class MainViewModel : ObservableObject
         LogoutCommand.NotifyCanExecuteChanged();
     }
 
+    // ── 실제 사진 위 표시 (추론 서비스가 overlay를 줄 때) ─────
+    /// <summary>사진 표시 좌표계의 가로 폭. 사진 크기와 상관없이 선 두께·글자 크기가 같아 보이게 이 폭으로 맞춘다.</summary>
+    public const double PhotoViewWidth = 400;
+
+    [ObservableProperty] private BitmapSource? overlayImage;      // 정렬된 실제 사진
+    [ObservableProperty] private double overlayViewHeight = 400;  // PhotoViewWidth에 맞춘 세로
+    [ObservableProperty] private bool preferPhoto = true;         // 사진 / 배치도 전환
+    [ObservableProperty] private bool showModelBoxes;             // "모델이 본 것"
+
+    public ObservableCollection<BoardPart> OverlayParts { get; } = new();
+    public ObservableCollection<ModelBox> ModelBoxes { get; } = new();
+
+    public bool HasOverlay => OverlayImage is not null;
+    public bool ShowPhoto => Panel == PanelMode.Board && HasOverlay && PreferPhoto;
+    public bool ShowMiniature => Panel == PanelMode.Board && !(HasOverlay && PreferPhoto);
+    public bool ShowViewToggle => Panel == PanelMode.Board && HasOverlay;
+    public string ViewToggleText => PreferPhoto ? "배치도 보기" : "사진 보기";
+
+    partial void OnOverlayImageChanged(BitmapSource? value) => RaisePanelChanged();
+    partial void OnPreferPhotoChanged(bool value) => RaisePanelChanged();
+
+    [RelayCommand]
+    private void ToggleView() => PreferPhoto = !PreferPhoto;
+
+    [RelayCommand]
+    private void ToggleModelBoxes() => ShowModelBoxes = !ShowModelBoxes;
+
+    private void ClearOverlay()
+    {
+        OverlayImage = null;
+        OverlayParts.Clear();
+        ModelBoxes.Clear();
+    }
+
+    /// <summary>
+    /// 추론 서비스가 준 정렬 사진과 구멍 좌표로, 미니어처와 같은 불량 표시를 사진 위에 만든다.
+    /// 누락 부품은 YOLO 박스가 없지만, 구멍 좌표로 그리므로 "여기에 꽂으세요" 자리가 정확히 나온다.
+    /// </summary>
+    private void BuildOverlay(InspectionResult r)
+    {
+        ClearOverlay();
+        if (r.Overlay is not { } o || o.Width <= 0 || string.IsNullOrEmpty(o.ImageJpeg)) return;
+
+        try
+        {
+            OverlayImage = Decode(Convert.FromBase64String(o.ImageJpeg));
+        }
+        catch
+        {
+            return;   // 사진이 깨졌으면 미니어처로
+        }
+
+        double k = PhotoViewWidth / o.Width;            // 사진 픽셀 → 표시 좌표
+        OverlayViewHeight = o.Height * k;
+
+        var map = o.Pinholes.ToDictionary(p => p.Pinhole, p => (X: p.X * k, Y: p.Y * k));
+        (double X, double Y)? Locate(Hole h) => map.TryGetValue(h.ToString(), out var v) ? v : null;
+
+        // 구멍 간격: 같은 열의 이웃한 두 행(B2, C2) 사이 거리
+        double pitch = map.TryGetValue("B2", out var b) && map.TryGetValue("C2", out var c)
+            ? Math.Abs(c.Y - b.Y) : 12;
+        double pad = pitch * 0.55;
+
+        int defectIndex = 0;
+        foreach (var part in r.Parts.OrderBy(p => p.Defect is null))
+        {
+            if (part.Defect is null) continue;   // 사진에는 불량만 그린다 (정상 부품은 사진 그대로 보인다)
+            var shape = PhotoLayout.From(part, defectIndex++, Locate, pad, pitch * 0.6, DescribeDefect, Korean);
+            if (shape is not null) OverlayParts.Add(shape);
+        }
+
+        foreach (var box in o.Boxes)
+        {
+            ModelBoxes.Add(new ModelBox(box.X1 * k, box.Y1 * k, (box.X2 - box.X1) * k, (box.Y2 - box.Y1) * k,
+                $"{Korean(box.Class)} {box.Confidence:0.00}", BoxColor(box.Class)));
+        }
+    }
+
+    /// <summary>"모델이 본 것" 박스 색. 저항 330Ω/470Ω은 서로 다른 색으로 구분되게.</summary>
+    private static string BoxColor(string cls) => cls switch
+    {
+        "resistance330" => "#FF9800",
+        "resistance470" => "#AB47BC",
+        "capacitor" => "#26C6DA",
+        "ic_chip" => "#BDBDBD",
+        "led" => "#FF5252",
+        "red_wire" => "#F44336",
+        "black_wire" => "#212121",
+        "white_wire" => "#FFFFFF",
+        _ => "#FFEB3B"
+    };
+
     public ObservableCollection<PartResult> Parts { get; } = new();
     public ObservableCollection<BoardCell> BoardCells { get; } = new();
     public ObservableCollection<BoardPart> BoardParts { get; } = new();
@@ -222,7 +314,8 @@ public partial class MainViewModel : ObservableObject
                  {
                      nameof(Panel), nameof(PanelImage), nameof(ShowBoard), nameof(ShowPanelImage),
                      nameof(ShowNoImage), nameof(ShowGuideNow), nameof(ShowInset), nameof(PanelLabel),
-                     nameof(NoImageText)
+                     nameof(NoImageText), nameof(HasOverlay), nameof(ShowPhoto), nameof(ShowMiniature),
+                     nameof(ShowViewToggle), nameof(ViewToggleText)
                  })
             OnPropertyChanged(name);
     }
@@ -260,6 +353,7 @@ public partial class MainViewModel : ObservableObject
         Parts.Clear();
         BoardParts.Clear();
         DefectCards.Clear();
+        ClearOverlay();
         RaisePanelChanged();
     }
 
@@ -296,6 +390,7 @@ public partial class MainViewModel : ObservableObject
         Parts.Clear();
         BoardParts.Clear();
         DefectCards.Clear();
+        ClearOverlay();
 
         byte[] image;
         try
@@ -350,6 +445,8 @@ public partial class MainViewModel : ObservableObject
             var shape = BoardPart.From(part, badgeIndex, DescribeDefect, Korean);
             if (shape is not null) BoardParts.Add(shape);
         }
+
+        BuildOverlay(r);
 
         switch (r.Verdict)
         {
