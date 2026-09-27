@@ -1,5 +1,37 @@
 # API 계약서
 
+## 관리자 웹/스테이션 → MES : `POST /api/auth/login`
+
+작업자 사번과 PIN을 검증하고 1시간 동안 사용할 수 있는 HS256 JWT를 발급한다. PIN은 DB에 BCrypt 해시로만 저장한다.
+
+### 요청
+
+```json
+{
+  "employeeId": "A-1042",
+  "pin": "1234"
+}
+```
+
+### 성공 응답 (`200 OK`)
+
+```json
+{
+  "accessToken": "eyJ...",
+  "tokenType": "Bearer",
+  "expiresIn": 3600,
+  "user": {
+    "employeeId": "A-1042",
+    "name": "홍길동",
+    "role": "WORKER"
+  }
+}
+```
+
+- 이후 요청은 `Authorization: Bearer {accessToken}` 헤더를 사용한다.
+- 사번이 없거나, 비활성 계정이거나, PIN이 틀리면 동일하게 `401 Unauthorized`를 반환한다.
+- 운영 환경에서는 MES와 스테이션에 동일한 `JWT_SECRET`(32바이트 이상)을 안전하게 설정한다.
+
 ## 스테이션 → 추론 서비스 : `POST /infer`
 
 ### 요청
