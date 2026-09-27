@@ -1,0 +1,241 @@
+<!--
+  보드 미니어처 (v13).
+
+  표시 문법: 불량 "유형"이 아니라 작업자가 할 "동작"으로 그린다. 색은 빨강 하나, 구분은 모양.
+    Normal   연한 윤곽선 + 부품 ID (배치 참고용)
+    Insert   꽂기    빨간 점선 빈 윤곽  — 여기가 비었다
+    Replace  교체    빨간 실선 윤곽      — 이걸 바꿔라
+    Remove   빼기    빨간 X             — 이걸 빼라
+    Move     옮기기  빨간 점선(가야 할 자리) + 빨간 점(지금 덮인 홀)
+  모든 불량에는 번호 배지를 붙이고, 오른쪽 카드도 같은 번호를 쓴다.
+
+  모양이 실제 검사 영역과 같은 비율(≈정사각형)이라, 나중에 배경을 정렬된 실제 사진으로
+  바꿔도 같은 좌표로 그릴 수 있다.
+-->
+<UserControl x:Class="Inspection.Hmi.Controls.BoardMiniature"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:Inspection.Hmi.ViewModels">
+
+    <UserControl.Resources>
+        <Storyboard x:Key="BlinkStoryboard" RepeatBehavior="Forever" AutoReverse="True">
+            <DoubleAnimation Storyboard.TargetProperty="Opacity" From="1.0" To="0.55" Duration="0:0:0.6"/>
+        </Storyboard>
+
+        <!-- 실선 윤곽: 정상(연하게) / 교체(빨강 두껍게) -->
+        <Style x:Key="SolidOutline" TargetType="Rectangle">
+            <Setter Property="Stroke" Value="#9E9384"/>
+            <Setter Property="StrokeThickness" Value="1.5"/>
+            <Setter Property="RadiusX" Value="3"/>
+            <Setter Property="RadiusY" Value="3"/>
+            <Setter Property="Fill" Value="Transparent"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Replace}">
+                    <Setter Property="Stroke" Value="#E53935"/>
+                    <Setter Property="StrokeThickness" Value="3.5"/>
+                    <Setter Property="Fill" Value="#33E53935"/>
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Storyboard="{StaticResource BlinkStoryboard}"/>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Remove}">
+                    <Setter Property="Stroke" Value="#E53935"/>
+                    <Setter Property="StrokeThickness" Value="3.5"/>
+                </DataTrigger>
+                <!-- 꽂기·옮기기는 점선 쪽이 그린다 -->
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Insert}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Move}">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 점선 윤곽: 꽂기 / 옮기기(가야 할 자리) -->
+        <Style x:Key="DashedOutline" TargetType="Rectangle">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Stroke" Value="#E53935"/>
+            <Setter Property="StrokeThickness" Value="3"/>
+            <Setter Property="StrokeDashArray" Value="2 1.5"/>
+            <Setter Property="RadiusX" Value="3"/>
+            <Setter Property="RadiusY" Value="3"/>
+            <Setter Property="Fill" Value="#1FE53935"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Insert}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Storyboard="{StaticResource BlinkStoryboard}"/>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Move}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 빼기: X -->
+        <Style x:Key="CrossStyle" TargetType="Path">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Remove}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                    <DataTrigger.EnterActions>
+                        <BeginStoryboard Storyboard="{StaticResource BlinkStoryboard}"/>
+                    </DataTrigger.EnterActions>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 정상 부품 ID (불량이면 숨기고 동작 이름표를 대신 보인다) -->
+        <Style x:Key="PartLabelStyle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#6B6355"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Center"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Normal}">
+                    <Setter Property="Visibility" Value="Visible"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 번호 배지 (불량일 때만) -->
+        <Style x:Key="BadgeStyle" TargetType="Border">
+            <Setter Property="Background" Value="#E53935"/>
+            <Setter Property="BorderBrush" Value="White"/>
+            <Setter Property="BorderThickness" Value="1.5"/>
+            <Setter Property="CornerRadius" Value="11"/>
+            <Setter Property="Width" Value="22"/>
+            <Setter Property="Height" Value="22"/>
+            <Setter Property="HorizontalAlignment" Value="Left"/>
+            <Setter Property="VerticalAlignment" Value="Top"/>
+            <Setter Property="Margin" Value="-11,-11,0,0"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Badge}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- 동작 이름표 (불량일 때만, 윤곽 아래) -->
+        <Style x:Key="VerbTagStyle" TargetType="Border">
+            <Setter Property="Background" Value="#E53935"/>
+            <Setter Property="CornerRadius" Value="3"/>
+            <Setter Property="Padding" Value="4,0"/>
+            <Setter Property="HorizontalAlignment" Value="Center"/>
+            <Setter Property="VerticalAlignment" Value="Bottom"/>
+            <!-- 음수 좌우 여백: 폭이 1칸인 전선에서도 글자가 세로로 접히지 않게 자리를 넓혀 준다 -->
+            <Setter Property="Margin" Value="-40,0,-40,-17"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Badge}" Value="">
+                    <Setter Property="Visibility" Value="Collapsed"/>
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <!-- 부모 크기에 맞춰 키우고 줄인다 (v12까지는 DownOnly라 커지지 않았다) -->
+    <Viewbox Stretch="Uniform">
+        <Border Background="#EDE6D6" CornerRadius="6">
+            <Grid Width="{Binding BoardWidth}" Height="{Binding BoardHeight}">
+
+                <!-- 전원 레일 선 (실제 보드처럼 빨강·파랑). 방향 확인 보조 -->
+                <Canvas IsHitTestVisible="False">
+                    <!-- 실측 배치: 왼쪽은 빨강이 바깥, 오른쪽은 빨강이 안쪽 (열 0·1 = X 22·40, 열 12·13 = X 334·352) -->
+                    <Line X1="8" Y1="4" X2="8" Y2="402" Stroke="#D9534F" StrokeThickness="1.5" Opacity="0.7"/>
+                    <Line X1="55" Y1="4" X2="55" Y2="402" Stroke="#3F7FD9" StrokeThickness="1.5" Opacity="0.7"/>
+                    <Line X1="319" Y1="4" X2="319" Y2="402" Stroke="#D9534F" StrokeThickness="1.5" Opacity="0.7"/>
+                    <Line X1="367" Y1="4" X2="367" Y2="402" Stroke="#3F7FD9" StrokeThickness="1.5" Opacity="0.7"/>
+                </Canvas>
+
+                <!-- 배경 홀 격자 -->
+                <ItemsControl ItemsSource="{Binding BoardCells}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                            <Setter Property="Canvas.Top"  Value="{Binding Y}"/>
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Rectangle Width="{Binding Size}" Height="{Binding Size}"
+                                       Fill="#C4BAA6" RadiusX="1" RadiusY="1" ToolTip="{Binding Label}"/>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- 부품 / 불량 표시 -->
+                <ItemsControl ItemsSource="{Binding BoardParts}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                            <Setter Property="Canvas.Top"  Value="{Binding Y}"/>
+                            <Setter Property="Panel.ZIndex" Value="10"/>
+                            <Style.Triggers>
+                                <!-- 불량을 정상 위에 그린다 -->
+                                <DataTrigger Binding="{Binding Badge}" Value="">
+                                    <Setter Property="Panel.ZIndex" Value="0"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="{Binding Width}" Height="{Binding Height}" ToolTip="{Binding Tooltip}"
+                                  Background="Transparent">
+                                <Rectangle Style="{StaticResource SolidOutline}"/>
+                                <Rectangle Style="{StaticResource DashedOutline}"/>
+
+                                <!-- 빼기: X -->
+                                <Path Style="{StaticResource CrossStyle}" Stretch="Fill" Margin="3"
+                                      Stroke="#E53935" StrokeThickness="3" Data="M0,0 L10,10 M10,0 L0,10"/>
+
+                                <!-- 옮기기: 지금 덮인 홀 -->
+                                <ItemsControl ItemsSource="{Binding Dots}" IsHitTestVisible="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><Canvas/></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemContainerStyle>
+                                        <Style TargetType="ContentPresenter">
+                                            <Setter Property="Canvas.Left" Value="{Binding X}"/>
+                                            <Setter Property="Canvas.Top"  Value="{Binding Y}"/>
+                                        </Style>
+                                    </ItemsControl.ItemContainerStyle>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Ellipse Width="{Binding Size}" Height="{Binding Size}" Fill="#E53935"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+
+                                <!-- 정상 부품 ID -->
+                                <TextBlock Text="{Binding PartId}" Style="{StaticResource PartLabelStyle}"/>
+
+                                <!-- 동작 이름표 -->
+                                <Border Style="{StaticResource VerbTagStyle}">
+                                    <TextBlock Text="{Binding Label}" Foreground="White" FontSize="11" FontWeight="Bold"/>
+                                </Border>
+
+                                <!-- 번호 배지 -->
+                                <Border Style="{StaticResource BadgeStyle}">
+                                    <TextBlock Text="{Binding Badge}" Foreground="White" FontSize="12" FontWeight="Bold"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Grid>
+        </Border>
+    </Viewbox>
+</UserControl>
