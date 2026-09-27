@@ -10,6 +10,7 @@
         <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
         <conv:EmptyStringToVisibilityConverter x:Key="EmptyToVisibility"/>
         <conv:StatusToBrushConverter x:Key="StatusToBrush"/>
+        <conv:ClassIsConverter x:Key="ClassIs"/>
 
         <!--
           산업용 버튼 스타일.

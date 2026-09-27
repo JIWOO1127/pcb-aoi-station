@@ -28,8 +28,11 @@ public record HoleDot(double X, double Y, double Size);
 /// <summary>미니어처의 부품 하나. 차지하는 홀들을 감싸는 사각형으로 그린다.</summary>
 /// <param name="Badge">불량 번호. 오른쪽 카드 번호와 같다. 정상이면 빈 문자열</param>
 /// <param name="Label">윤곽 안 글자. 정상은 부품 ID, 불량은 동작("꽂기")</param>
+/// <param name="Class">아이콘을 고르는 부품 종류 (resistance330, led ...). 추가 부품이면 실제로 탐지된 종류</param>
+/// <param name="IconAngle">아이콘 회전. 아이콘은 가로로 그려 두고, 세로로 꽂힌 부품이면 90도 돌린다</param>
 public record BoardPart(string PartId, double X, double Y, double Width, double Height,
-    PartShapeKind Kind, string Badge, string Label, string Tooltip, List<HoleDot> Dots)
+    PartShapeKind Kind, string Badge, string Label, string Tooltip, List<HoleDot> Dots,
+    string Class, double IconAngle)
 {
     public static PartShapeKind KindOf(DefectType? defect) => defect switch
     {
@@ -81,7 +84,11 @@ public record BoardPart(string PartId, double X, double Y, double Width, double 
                        + $"탐지된 것: {korean(p.DetectedClass)}\n"
                        + $"홀: {string.Join(", ", holes)}";
 
-        return new BoardPart(p.PartId, left, top, width, height, kind, badge, label, tooltip, dots);
+        // 아이콘: 있어야 할 부품 모양 (꽂기라면 "여기에 이 모양을 꽂아라"). 추가 부품은 실제로 있는 것
+        string cls = p.ExpectedClass is "-" or "" ? (p.DetectedClass ?? "") : p.ExpectedClass;
+        double angle = height > width ? 90 : 0;
+
+        return new BoardPart(p.PartId, left, top, width, height, kind, badge, label, tooltip, dots, cls, angle);
     }
 }
 

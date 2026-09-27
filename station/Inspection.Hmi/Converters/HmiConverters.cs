@@ -120,3 +120,20 @@ public class StatusToBrushConverter : IValueConverter
     public object ConvertBack(object? value, Type t, object? p, CultureInfo c)
         => throw new NotSupportedException();
 }
+
+/// <summary>
+/// 부품 종류가 parameter와 같으면 보인다. parameter는 "red_wire|black_wire"처럼 여러 개 가능.
+/// 미니어처에서 종류별 아이콘 하나만 보이게 할 때 쓴다.
+/// </summary>
+public class ClassIsConverter : IValueConverter
+{
+    public object Convert(object? value, Type t, object? parameter, CultureInfo c)
+    {
+        var cls = value as string ?? "";
+        var options = (parameter as string ?? "").Split('|');
+        return options.Contains(cls) ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    public object ConvertBack(object? value, Type t, object? p, CultureInfo c)
+        => throw new NotSupportedException();
+}

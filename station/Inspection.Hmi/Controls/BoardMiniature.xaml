@@ -9,6 +9,11 @@
     Move     옮기기  빨간 점선(가야 할 자리) + 빨간 점(지금 덮인 홀)
   모든 불량에는 번호 배지를 붙이고, 오른쪽 카드도 같은 번호를 쓴다.
 
+  v17: 부품을 네모 대신 실제 모양 아이콘으로 그린다 (이미지 파일 없이 도형으로).
+    저항은 색띠까지 그려 330Ω(주황·주황·갈색)과 470Ω(노랑·보라·갈색)을 보드와 똑같이 구분한다.
+    "다른 부품(330Ω → 470Ω)" 불량이 바로 이 색띠 차이이기 때문이다.
+    꽂기·옮기기는 아이콘을 흐리게 그려 "여기에 이 모양을 꽂아라"를 보여준다.
+
   모양이 실제 검사 영역과 같은 비율(≈정사각형)이라, 나중에 배경을 정렬된 실제 사진으로
   바꿔도 같은 좌표로 그릴 수 있다.
 -->
@@ -24,7 +29,8 @@
 
         <!-- 실선 윤곽: 정상(연하게) / 교체(빨강 두껍게) -->
         <Style x:Key="SolidOutline" TargetType="Rectangle">
-            <Setter Property="Stroke" Value="#9E9384"/>
+            <!-- 정상 부품은 아이콘만으로 충분해서 윤곽선을 그리지 않는다 -->
+            <Setter Property="Stroke" Value="Transparent"/>
             <Setter Property="StrokeThickness" Value="1.5"/>
             <Setter Property="RadiusX" Value="3"/>
             <Setter Property="RadiusY" Value="3"/>
@@ -94,10 +100,27 @@
             <Setter Property="HorizontalAlignment" Value="Center"/>
             <Setter Property="VerticalAlignment" Value="Center"/>
             <Setter Property="IsHitTestVisible" Value="False"/>
+            <!-- v17: 아이콘으로 대신한다 (부품 ID는 마우스를 올리면 툴팁으로) -->
             <Setter Property="Visibility" Value="Collapsed"/>
+        </Style>
+
+        <!-- 아이콘 층의 진하기: 정상은 또렷하게, 꽂기·옮기기는 "여기 들어갈 모양"이라 흐리게 -->
+        <Style x:Key="IconLayer" TargetType="Viewbox">
+            <Setter Property="Opacity" Value="0.95"/>
+            <Setter Property="Stretch" Value="Uniform"/>
+            <Setter Property="IsHitTestVisible" Value="False"/>
             <Style.Triggers>
-                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Normal}">
-                    <Setter Property="Visibility" Value="Visible"/>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Insert}">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Move}">
+                    <Setter Property="Opacity" Value="0.35"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Replace}">
+                    <Setter Property="Opacity" Value="0.6"/>
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Kind}" Value="{x:Static vm:PartShapeKind.Remove}">
+                    <Setter Property="Opacity" Value="0.6"/>
                 </DataTrigger>
             </Style.Triggers>
         </Style>
@@ -193,6 +216,84 @@
                         <DataTemplate>
                             <Grid Width="{Binding Width}" Height="{Binding Height}" ToolTip="{Binding Tooltip}"
                                   Background="Transparent">
+                                <!--
+                                  부품 아이콘. 모두 가로 방향으로 그려 두고, 세로로 꽂힌 부품은 90도 돌린다.
+                                  Viewbox가 부품이 차지한 홀 영역에 맞춰 크기를 조절한다.
+                                -->
+                                <Viewbox Style="{StaticResource IconLayer}" Margin="1">
+                                    <Grid>
+                                        <Grid.LayoutTransform>
+                                            <RotateTransform Angle="{Binding IconAngle}"/>
+                                        </Grid.LayoutTransform>
+
+                                        <!-- 저항: 다리 + 몸통 + 색띠 3개 + 금색 띠 -->
+                                        <Canvas Width="60" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=resistance330|resistance470}">
+                                            <Line X1="0" Y1="8" X2="60" Y2="8" Stroke="#8A8A8A" StrokeThickness="1.6"/>
+                                            <Rectangle Canvas.Left="12" Canvas.Top="2" Width="36" Height="12" RadiusX="5" RadiusY="5"
+                                                       Fill="#E3C98F" Stroke="#B89A5E" StrokeThickness="0.6"/>
+                                            <!-- 330Ω: 주황 주황 갈색 -->
+                                            <Canvas Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=resistance330}">
+                                                <Rectangle Canvas.Left="18" Canvas.Top="2" Width="3.5" Height="12" Fill="#F57C00"/>
+                                                <Rectangle Canvas.Left="24" Canvas.Top="2" Width="3.5" Height="12" Fill="#F57C00"/>
+                                                <Rectangle Canvas.Left="30" Canvas.Top="2" Width="3.5" Height="12" Fill="#6D3B1F"/>
+                                            </Canvas>
+                                            <!-- 470Ω: 노랑 보라 갈색 -->
+                                            <Canvas Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=resistance470}">
+                                                <Rectangle Canvas.Left="18" Canvas.Top="2" Width="3.5" Height="12" Fill="#F2C511"/>
+                                                <Rectangle Canvas.Left="24" Canvas.Top="2" Width="3.5" Height="12" Fill="#7B3FA0"/>
+                                                <Rectangle Canvas.Left="30" Canvas.Top="2" Width="3.5" Height="12" Fill="#6D3B1F"/>
+                                            </Canvas>
+                                            <Rectangle Canvas.Left="40" Canvas.Top="2" Width="3" Height="12" Fill="#C9A227"/>
+                                        </Canvas>
+
+                                        <!-- 전선: 색깔 굵은 선 (흰 선은 배경과 구분되게 회색 테두리) -->
+                                        <Canvas Width="60" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=red_wire}">
+                                            <Line X1="3" Y1="8" X2="57" Y2="8" Stroke="#D32F2F" StrokeThickness="6"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Canvas>
+                                        <Canvas Width="60" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=black_wire}">
+                                            <Line X1="3" Y1="8" X2="57" Y2="8" Stroke="#212121" StrokeThickness="6"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Canvas>
+                                        <Canvas Width="60" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=white_wire}">
+                                            <Line X1="3" Y1="8" X2="57" Y2="8" Stroke="#8A8A8A" StrokeThickness="7.5"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                            <Line X1="3" Y1="8" X2="57" Y2="8" Stroke="#FAFAFA" StrokeThickness="5.5"
+                                                  StrokeStartLineCap="Round" StrokeEndLineCap="Round"/>
+                                        </Canvas>
+
+                                        <!-- LED: 빨간 원 + 반사광 -->
+                                        <Canvas Width="30" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=led}">
+                                            <Ellipse Canvas.Left="7.5" Canvas.Top="0.5" Width="15" Height="15"
+                                                     Fill="#E53935" Stroke="#B71C1C" StrokeThickness="0.8"/>
+                                            <Ellipse Canvas.Left="10.5" Canvas.Top="3" Width="4.5" Height="3.5" Fill="#FFCDD2"/>
+                                        </Canvas>
+
+                                        <!-- 캐패시터(전해): 어두운 원 + 극성 표시 띠 -->
+                                        <Canvas Width="30" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=capacitor}">
+                                            <Ellipse Canvas.Left="7.5" Canvas.Top="0.5" Width="15" Height="15"
+                                                     Fill="#37474F" Stroke="#1C262B" StrokeThickness="0.8"/>
+                                            <Rectangle Canvas.Left="9.5" Canvas.Top="4" Width="2.5" Height="8" Fill="#B0BEC5"/>
+                                        </Canvas>
+
+                                        <!-- IC: 검은 몸통 + 양쪽 핀 + 1번 핀 쪽 홈 -->
+                                        <Canvas Width="70" Height="16"
+                                                Visibility="{Binding Class, Converter={StaticResource ClassIs}, ConverterParameter=ic_chip}">
+                                            <Rectangle Canvas.Left="3" Canvas.Top="0" Width="64" Height="2.5" Fill="#9E9E9E"/>
+                                            <Rectangle Canvas.Left="3" Canvas.Top="13.5" Width="64" Height="2.5" Fill="#9E9E9E"/>
+                                            <Rectangle Canvas.Left="2" Canvas.Top="2" Width="66" Height="12" RadiusX="1" RadiusY="1"
+                                                       Fill="#212121"/>
+                                            <Ellipse Canvas.Left="0" Canvas.Top="5" Width="6" Height="6" Fill="#616161"/>
+                                        </Canvas>
+                                    </Grid>
+                                </Viewbox>
+
                                 <Rectangle Style="{StaticResource SolidOutline}"/>
                                 <Rectangle Style="{StaticResource DashedOutline}"/>
 
