@@ -3,6 +3,8 @@ package com.example.pcb_manage.auth;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.util.Base64;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
@@ -37,6 +39,47 @@ public class JwtTokenService {
 
     public long expirationSeconds() {
         return expirationSeconds;
+    }
+
+    public TokenClaims verify(String token) {
+        try {
+            String[] parts = token.split("\\.");
+            if (parts.length != 3) {
+                throw new IllegalArgumentException("잘못된 JWT 형식입니다.");
+            }
+            String content = parts[0] + "." + parts[1];
+            byte[] expected = Base64.getUrlDecoder().decode(sign(content));
+            byte[] actual = Base64.getUrlDecoder().decode(parts[2]);
+            if (!java.security.MessageDigest.isEqual(expected, actual)) {
+                throw new IllegalArgumentException("JWT 서명이 올바르지 않습니다.");
+            }
+            String payload = new String(Base64.getUrlDecoder().decode(parts[1]), StandardCharsets.UTF_8);
+            TokenClaims claims = new TokenClaims(readString(payload, "sub"), readString(payload, "name"),
+                    readString(payload, "role"), readLong(payload, "exp"));
+            if (claims.expiresAt() <= Instant.now().getEpochSecond()) {
+                throw new IllegalArgumentException("JWT가 만료되었습니다.");
+            }
+            return claims;
+        } catch (IllegalArgumentException exception) {
+            throw exception;
+        } catch (Exception exception) {
+            throw new IllegalArgumentException("JWT를 확인할 수 없습니다.", exception);
+        }
+    }
+
+    private String readString(String json, String key) {
+        Matcher matcher = Pattern.compile("\\\"" + key + "\\\":\\\"((?:\\\\.|[^\\\"])*)\\\"").matcher(json);
+        if (!matcher.find()) throw new IllegalArgumentException("JWT 필드가 없습니다: " + key);
+        return matcher.group(1).replace("\\\"", "\"").replace("\\\\", "\\");
+    }
+
+    private long readLong(String json, String key) {
+        Matcher matcher = Pattern.compile("\\\"" + key + "\\\":(\\d+)").matcher(json);
+        if (!matcher.find()) throw new IllegalArgumentException("JWT 필드가 없습니다: " + key);
+        return Long.parseLong(matcher.group(1));
+    }
+
+    public record TokenClaims(String employeeId, String name, String role, long expiresAt) {
     }
 
     private String encodeJson(String value) {

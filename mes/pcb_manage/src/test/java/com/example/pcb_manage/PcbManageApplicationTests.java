@@ -1,6 +1,8 @@
 package com.example.pcb_manage;
 
 import static org.hamcrest.Matchers.matchesPattern;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -14,12 +16,16 @@ import org.springframework.jdbc.core.simple.JdbcClient;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
+import com.example.pcb_manage.auth.JwtTokenService;
+import com.example.pcb_manage.auth.WorkerAccount;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 class PcbManageApplicationTests {
 	@Autowired MockMvc mockMvc;
 	@Autowired JdbcClient jdbcClient;
 	@Autowired PasswordEncoder passwordEncoder;
+	@Autowired JwtTokenService jwtTokenService;
 
 	@Test
 	void contextLoads() {
@@ -53,6 +59,14 @@ class PcbManageApplicationTests {
 		mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
 				.content("{\"employeeId\":\"A-1044\",\"pin\":\"9012\"}"))
 				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void issuedJwtCanBeVerifiedAndTamperingIsRejected() {
+		String token = jwtTokenService.createToken(new WorkerAccount("ADMIN-1", "관리자", "unused", "ADMIN", true));
+		assertEquals("ADMIN-1", jwtTokenService.verify(token).employeeId());
+		assertEquals("ADMIN", jwtTokenService.verify(token).role());
+		assertThrows(IllegalArgumentException.class, () -> jwtTokenService.verify(token + "tampered"));
 	}
 
 	private void insertWorker(String workerId, String name, String pin, boolean active) {
