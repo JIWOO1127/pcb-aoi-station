@@ -298,7 +298,7 @@ public partial class MainViewModel : ObservableObject
 
     public string PanelLabel => Panel switch
     {
-        PanelMode.Board => "보드 배치",
+        PanelMode.Board => ShowPhoto ? "검사한 사진 (정렬됨)" : "보드 배치",
         PanelMode.Captured => "검사한 사진",
         _ => IsCameraMode ? "실시간" : "선택한 사진"
     };
