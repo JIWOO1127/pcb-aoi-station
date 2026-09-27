@@ -18,6 +18,9 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.example.pcb_manage.auth.JwtTokenService;
 import com.example.pcb_manage.auth.WorkerAccount;
+import com.example.pcb_manage.admin.AdminUserController.CreateUserRequest;
+import com.example.pcb_manage.admin.AdminUserService;
+import com.example.pcb_manage.admin.AuditLogRepository;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -26,6 +29,8 @@ class PcbManageApplicationTests {
 	@Autowired JdbcClient jdbcClient;
 	@Autowired PasswordEncoder passwordEncoder;
 	@Autowired JwtTokenService jwtTokenService;
+	@Autowired AdminUserService adminUserService;
+	@Autowired AuditLogRepository auditLogRepository;
 
 	@Test
 	void contextLoads() {
@@ -67,6 +72,15 @@ class PcbManageApplicationTests {
 		assertEquals("ADMIN-1", jwtTokenService.verify(token).employeeId());
 		assertEquals("ADMIN", jwtTokenService.verify(token).role());
 		assertThrows(IllegalArgumentException.class, () -> jwtTokenService.verify(token + "tampered"));
+	}
+
+	@Test
+	void adminCanCreateUserAndAuditLogDoesNotContainPassword() {
+		var created = adminUserService.create(new CreateUserRequest("WEB-ADMIN", "웹 관리자", "secret-pin", "ADMIN"), "ROOT");
+		assertEquals("ADMIN", created.role());
+		var logs = auditLogRepository.list("ROOT", "USER_CREATE", null, null, 0, 20);
+		assertEquals(1, logs.size());
+		org.junit.jupiter.api.Assertions.assertFalse(logs.get(0).details().contains("secret-pin"));
 	}
 
 	private void insertWorker(String workerId, String name, String pin, boolean active) {
