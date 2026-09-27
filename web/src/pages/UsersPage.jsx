@@ -1,0 +1,14 @@
+import { useMemo, useState } from 'react';
+import { KeyRound, Plus, Search } from 'lucide-react';
+import { users as initialUsers } from '../mocks/data';
+import { ConfirmModal, DataTable, Field, Modal, PageHeader, SearchFilter, StatusBadge } from '../components/UI';
+
+export default function UsersPage() {
+  const [items, setItems] = useState(initialUsers); const [keyword, setKeyword] = useState(''); const [modal, setModal] = useState(null); const [reset, setReset] = useState(null);
+  const rows = useMemo(() => items.filter((x) => !keyword || `${x.employeeId} ${x.name}`.includes(keyword)), [items, keyword]);
+  const columns = [{ key: 'employeeId', label: '사번', render: (v) => <b className="cell-id">{v}</b> }, { key: 'name', label: '이름' }, { key: 'role', label: 'Role', render: (v) => <StatusBadge value={v} /> }, { key: 'status', label: '상태', render: (v) => <StatusBadge value={v} dot /> }, { key: 'lastLogin', label: '최근 로그인' }, { key: 'action', label: '관리', render: (_, row) => <div className="row-actions"><button onClick={() => setModal(row)}>수정</button><button onClick={() => setReset(row)}><KeyRound size={13} /> 초기화</button></div> }];
+  return <><PageHeader eyebrow="SYSTEM MANAGEMENT" title="사용자 관리" description="MES 접근 계정과 역할 권한을 관리합니다. ADMIN 전용 메뉴입니다." action={<button className="btn btn-primary" onClick={() => setModal({ new: true })}><Plus size={16} /> 사용자 추가</button>} /><SearchFilter onReset={() => setKeyword('')}><Field label="사용자 검색"><div className="input-icon small"><Search size={15} /><input value={keyword} onChange={(e) => setKeyword(e.target.value)} placeholder="사번 또는 이름" /></div></Field><Field label="Role"><select><option>전체 Role</option><option>ADMIN</option><option>ENGINEER</option><option>VIEWER</option></select></Field></SearchFilter><div className="panel table-panel"><DataTable columns={columns} rows={rows} /></div>
+    <Modal open={!!modal} title={modal?.new ? '사용자 추가' : '사용자 정보 수정'} onClose={() => setModal(null)} footer={<><button className="btn btn-ghost" onClick={() => setModal(null)}>취소</button><button className="btn btn-primary" onClick={() => setModal(null)}>저장</button></>}><div className="form-grid two"><Field label="사번"><input defaultValue={modal?.employeeId || ''} /></Field><Field label="이름"><input defaultValue={modal?.name || ''} /></Field><Field label="Role"><select defaultValue={modal?.role || 'VIEWER'}><option>ADMIN</option><option>ENGINEER</option><option>VIEWER</option></select></Field><Field label="상태"><select defaultValue={modal?.status || 'ACTIVE'}><option>ACTIVE</option><option>INACTIVE</option></select></Field></div></Modal>
+    <ConfirmModal open={!!reset} title="비밀번호 초기화" message={`${reset?.name} (${reset?.employeeId}) 사용자의 비밀번호를 초기화하시겠습니까?`} onClose={() => setReset(null)} onConfirm={() => setReset(null)} confirmText="초기화" />
+  </>;
+}
