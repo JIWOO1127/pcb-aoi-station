@@ -24,5 +24,10 @@ export const recipeService = { list: () => delay(data.recipes), get: (id) => del
 export const inspectionService = { list: () => delay(data.inspections), get: (id) => delay(data.inspections.find((item) => item.id === id) || data.inspections[0]) };
 export const stationService = { list: () => delay(data.stations), get: (id) => delay(data.stations.find((item) => item.id === id)) };
 export const modelService = { list: () => delay(data.models), get: (id) => delay(data.models.find((item) => item.id === id)) };
-export const userService = { list: () => delay(data.users) };
-export const auditService = { list: () => delay(data.auditLogs) };
+export const userService = {
+  list: () => request('/admin/users'),
+  create: (user) => request('/admin/users', { method: 'POST', body: JSON.stringify(user) }),
+  update: (employeeId, user) => request(`/admin/users/${employeeId}`, { method: 'PUT', body: JSON.stringify(user) }),
+  resetPassword: (employeeId, password) => request(`/admin/users/${employeeId}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
+};
+export const auditService = { list: (filters = {}) => request(`/admin/audit-logs?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString()}`) };
