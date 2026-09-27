@@ -10,7 +10,7 @@
     },
     {
       "partId": "R1",
-      "expectedClass": "resistance330",
+      "expectedClass": "resistance470",
       "holes": [ "E9", "F9", "G9", "H9" ]
     },
     {
