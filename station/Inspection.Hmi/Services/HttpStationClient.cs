@@ -83,4 +83,24 @@ public class HttpStationClient : IStationClient
             return new LoginOutcome(LoginStatus.Unavailable, null, "스테이션에 연결할 수 없습니다.");
         }
     }
+    
+    /// <summary>
+    /// GET /api/mes/status. 5초마다 불린다.
+    /// 실패하면 null("모름") → 헤더 점이 회색. 예외를 던지지 않아서 스테이션이 꺼져 있어도 HMI는 멀쩡하다.
+    /// </summary>
+    public async Task<MesStatus?> GetMesStatusAsync(CancellationToken ct = default)
+    {
+        // 상태 확인은 2초 안에 답이 없으면 포기한다 (검사용 긴 타임아웃을 기다리지 않도록)
+        using var timeout = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        timeout.CancelAfter(TimeSpan.FromSeconds(2));
+
+        try
+        {
+            return await _http.GetFromJsonAsync<MesStatus>("/api/mes/status", JsonOptions, timeout.Token);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException || !ct.IsCancellationRequested)
+        {
+            return null;
+        }
+    }
 }

@@ -52,8 +52,9 @@
                     <Ellipse Width="11" Height="11" Margin="0,0,5,0"
                              Fill="{Binding InferenceOk, Converter={StaticResource StatusToBrush}}"/>
                     <TextBlock Text="추론" Foreground="#9E9E9E" FontSize="13" Margin="0,0,14,0"/>
-                    <Ellipse Width="11" Height="11" Fill="#757575" Margin="0,0,5,0"/>
-                    <TextBlock Text="MES" Foreground="#9E9E9E" FontSize="13"/>
+                    <Ellipse Width="11" Height="11" Margin="0,0,5,0"
+                             Fill="{Binding MesOk, Converter={StaticResource StatusToBrush}}"/>
+                    <TextBlock Text="{Binding MesText}" Foreground="#9E9E9E" FontSize="13"/>
                 </StackPanel>
                 <TextBlock/>
             </DockPanel>

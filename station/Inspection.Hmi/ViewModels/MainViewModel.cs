@@ -49,6 +49,8 @@ public partial class MainViewModel : ObservableObject
     private readonly bool _requireLogin;     // true면 로그인해야 검사할 수 있다 (Hmi:RequireLogin)
     private readonly Dispatcher _ui;
     private readonly DispatcherTimer _passTimer;
+    private readonly DispatcherTimer _mesTimer;   // 5초마다 스테이션에 MES 전송 상태를 묻는다
+    private bool _mesRefreshing;                  // 이전 조회가 끝나기 전에 다시 부르지 않게
 
     private readonly int _maxCameraIndex;
     private readonly double _guideAspect;   // 검사 영역의 가로/세로 (화면에 보이는 방향 기준)
@@ -90,6 +92,11 @@ public partial class MainViewModel : ObservableObject
             _passTimer.Stop();
             if (State == ScreenState.Pass) GoIdle();
         };
+
+        _mesTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _mesTimer.Tick += async (_, _) => await RefreshMesStatusAsync();
+        _mesTimer.Start();
+        _ = RefreshMesStatusAsync();   // 5초 기다리지 않고 바로 한 번
 
         _input.Camera.FrameArrived += OnFrameArrived;
         _input.Camera.ConnectionChanged += OnCameraConnectionChanged;
@@ -269,6 +276,43 @@ public partial class MainViewModel : ObservableObject
     [ObservableProperty] private BitmapSource? capturedFull;    // 검사한 사진 원본 전체 (작은 창용)
     [ObservableProperty] private bool? cameraOk;                // null 회색 / true 초록 / false 빨강
     [ObservableProperty] private bool? inferenceOk;             // 마지막 검사 결과로 추정
+    [ObservableProperty] private bool? mesOk;                   // null 회색(꺼짐·모름) / true 초록 / false 빨강
+    [ObservableProperty] private string mesText = "MES";        // 못 보낸 기록이 있으면 "MES 대기 N건"
+
+    /// <summary>
+    /// 헤더 MES 점 갱신. 스테이션 GET /api/mes/status (2초 제한, 실패하면 null).
+    ///   null 또는 전송 꺼짐       → 회색 "MES"
+    ///   연결됨 + 대기 0건         → 초록 "MES"
+    ///   그 외 (연결 실패·대기 있음) → 빨강, 대기가 있으면 "MES 대기 N건"
+    /// </summary>
+    private async Task RefreshMesStatusAsync()
+    {
+        if (_mesRefreshing) return;
+        _mesRefreshing = true;
+        try
+        {
+            var s = await _client.GetMesStatusAsync();
+            if (s is null || !s.Enabled)
+            {
+                MesOk = null;
+                MesText = "MES";
+            }
+            else if (s.Connected == true && s.Pending == 0)
+            {
+                MesOk = true;
+                MesText = "MES";
+            }
+            else
+            {
+                MesOk = false;
+                MesText = s.Pending > 0 ? $"MES 대기 {s.Pending}건" : "MES";
+            }
+        }
+        finally
+        {
+            _mesRefreshing = false;
+        }
+    }
     [ObservableProperty] private bool isCameraMode;
     [ObservableProperty] private bool showFrameGuide;
 

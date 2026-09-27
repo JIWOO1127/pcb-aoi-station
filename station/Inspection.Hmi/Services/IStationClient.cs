@@ -22,4 +22,8 @@ public interface IStationClient
     Task<LoginOutcome> LoginAsync(string employeeId, string pin, CancellationToken ct = default)
         => Task.FromResult(new LoginOutcome(LoginStatus.Ok,
             new LoginResult(employeeId, "테스트 작업자", "WORKER", Offline: true)));
+
+    Task<MesStatus?> GetMesStatusAsync(CancellationToken ct = default)
+        => Task.FromResult<MesStatus?>(null);
+
 }
