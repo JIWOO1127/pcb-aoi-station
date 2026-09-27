@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using Microsoft.Extensions.Configuration;
 
 namespace Inspection.Hmi.Services;
@@ -9,26 +9,27 @@ namespace Inspection.Hmi.Services;
 /// </summary>
 public class FileImageSource : IImageSource
 {
-    private string? _path;
-
     public FileImageSource(IConfiguration config)
     {
-        _path = config["TestImage:Path"];
+        Path = config["TestImage:Path"];
     }
 
+    /// <summary>현재 선택된 사진 경로 (미리보기 표시에 쓴다).</summary>
+    public string? Path { get; private set; }
+
     /// <summary>작업자가 다른 사진을 골랐을 때.</summary>
-    public void SetPath(string path) => _path = path;
+    public void SetPath(string path) => Path = path;
 
     public string Description =>
-        _path is null ? "사진 없음" : $"파일: {Path.GetFileName(_path)}";
+        Path is null ? "사진 없음" : $"파일: {System.IO.Path.GetFileName(Path)}";
 
     public async Task<byte[]> GetImageAsync(CancellationToken ct = default)
     {
-        if (_path is null)
+        if (Path is null)
             throw new InvalidOperationException("검사할 사진이 지정되지 않았습니다.");
-        if (!File.Exists(_path))
-            throw new FileNotFoundException($"사진 파일이 없습니다: {_path}");
+        if (!File.Exists(Path))
+            throw new FileNotFoundException($"사진 파일이 없습니다: {Path}");
 
-        return await File.ReadAllBytesAsync(_path, ct);
+        return await File.ReadAllBytesAsync(Path, ct);
     }
 }

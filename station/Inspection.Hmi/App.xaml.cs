@@ -1,4 +1,4 @@
-﻿using System.IO;
+using System.IO;
 using System.Windows;
 using Inspection.Hmi.Services;
 using Inspection.Hmi.ViewModels;
@@ -22,9 +22,12 @@ public partial class App : Application
             })
             .ConfigureServices((context, services) =>
             {
-                // 검사할 이미지 공급처. 지금은 파일, 나중에 CameraImageSource로 교체·전환.
+                // 검사할 이미지 공급처: 카메라(기본) ↔ 사진 파일 전환.
+                // 카메라는 앱이 끝날 때 DI가 Dispose해서 장치를 놓아준다.
+                services.AddSingleton<CameraImageSource>();
                 services.AddSingleton<FileImageSource>();
-                services.AddSingleton<IImageSource>(sp => sp.GetRequiredService<FileImageSource>());
+                services.AddSingleton<SwitchableImageSource>();
+                services.AddSingleton<IImageSource>(sp => sp.GetRequiredService<SwitchableImageSource>());
 
                 // 스테이션 서버 호출.
                 // 서버 없이 화면만 보려면 아래 두 줄을 주석 처리하고
