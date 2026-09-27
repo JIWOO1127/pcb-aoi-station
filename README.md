@@ -6,13 +6,13 @@
 
 ```mermaid
 flowchart LR
-    CAM[카메라<br/>iPhone + Camo]
+    CAM[카메라<br/>폰 + Camo · 1280x720]
 
     subgraph VPC[비전 PC · 라인 단]
         HMI[작업자 HMI<br/>C# WPF]
         ST[스테이션 서버<br/>C# ASP.NET Core<br/>판정 규칙 엔진]
-        INF[추론 서비스<br/>Python · YOLO]
-        BUF[(SQLite<br/>단절 시 버퍼)]
+        INF[추론 서비스<br/>Python · 방향·크롭·OCR·YOLO]
+        BUF[(보관함 폴더<br/>mes-outbox)]
     end
 
     subgraph SRV[MES 서버 · 관리 단]
@@ -22,11 +22,11 @@ flowchart LR
 
     WEB[관리자 웹<br/>React]
 
-    CAM -->|영상| ST
-    HMI -->|검사 트리거·재검사| ST
+    CAM -->|영상| HMI
+    HMI -->|사진 + 검사 요청·재검사| ST
     ST -->|결과| HMI
-    ST -->|이미지| INF
-    INF -->|부품 탐지 결과| ST
+    ST -->|원본 사진| INF
+    INF -->|홀별 부품 목록| ST
     ST <--> BUF
     ST -->|검사 기록 전송| MES
     MES -->|레시피·작업자 정보| ST
@@ -37,7 +37,9 @@ flowchart LR
 **원칙**
 - 판정은 스테이션(C#) 한 곳에서만 한다. 추론 서비스는 탐지 결과만, MES는 기록과 기준만 담당한다.
 - DB에 직접 붙는 것은 MES뿐이다. 나머지는 모두 API로 접근한다.
-- MES가 끊겨도 검사는 계속된다. 스테이션이 SQLite에 쌓아두고 복구 후 재전송한다.
+- MES가 끊겨도 검사는 계속된다. 스테이션이 검사 기록을 보관함 폴더(`mes-outbox`, 기록 한 건 = JSON 파일 하나)에 먼저 저장하고, 백그라운드에서 오래된 것부터 MES로 보낸다.
+  - SQLite 대신 파일을 쓰는 이유: 비전 PC의 보안 정책(애플리케이션 제어)이 새 네이티브 DLL을 막은 적이 있고(torch), 폴더만 열면 밀린 기록이 보여 확인이 쉽다.
+- 사진은 돌리지 않은 원본 그대로 보낸다. 방향은 추론 서비스가 판단한다 (촬영 기준: 보드 번호 10이 화면 위).
 
 ## 2. 검사 흐름
 
@@ -49,18 +51,32 @@ sequenceDiagram
     participant INF as 추론 (Python)
     participant MES as MES (Java)
 
+    작업자->>HMI: 사번 + PIN 로그인
+    HMI->>ST: 로그인 요청
+    ST->>MES: POST /api/auth/login
     작업자->>HMI: Space (검사)
-    HMI->>ST: POST /api/trigger
-    ST->>ST: 프레임 획득 · 촬영 품질 검사 · 기준 마크 정렬
-    ST->>INF: POST /infer (정렬된 이미지)
-    INF-->>ST: 부품별 종류 · 신뢰도 · 박스
-    ST->>ST: 레시피와 비교해 판정 (누락·위치·오부품·전선 색)
+    HMI->>HMI: 카메라 최신 프레임 1장 캡처
+    HMI->>ST: POST /api/trigger (사진, 제품, 작업자)
+    ST->>INF: POST /infer (원본 사진)
+    INF->>INF: 방향 판단 · 레일/라벨로 크롭 · 홀 위치 계산 · YOLO · 홀-박스 대조
+    INF-->>ST: 홀별 부품 목록 (pinhole, class, confidence)
+    ST->>ST: 레시피(홀 목록)와 비교해 판정 (누락·다른 부품·전선 색·위치·추가)
     ST-->>HMI: 판정 결과
-    ST->>MES: POST /inspections (실패 시 SQLite 보관 후 재전송)
-    작업자->>HMI: FAIL 확인 (불량품 분리)
-    HMI->>ST: 확인 기록
-    ST->>MES: POST /inspections/{id}/confirmations
+    ST->>ST: 보관함에 기록 저장
+    ST->>MES: POST /api/inspections (실패 시 보관함에 남기고 재전송)
+    alt FAIL
+        작업자->>HMI: 번호대로 수리 → Space (재검사, 같은 보드 #0007-2)
+        작업자->>HMI: 또는 F (불량 확정)
+        HMI->>ST: 확인 기록
+        ST->>MES: POST /api/inspections/{id}/confirmations
+    end
 ```
+
+**판정 방식 (홀 목록)**
+- 보드 좌표는 A~U(보드 번호 10~30, 21행) × 0~13(레일2 + A~E + F~J + 레일2, 14열). 전원 레일에는 E·K·Q 행이 없다.
+- 레시피 = 부품마다 "덮어야 할 홀 목록". 정답 보드를 추론에 넣어 나온 결과를 사람이 실제 보드와 대조해 확정한다 (NE555-A v3).
+- 판정: 홀이 전부 비었으면 누락 → 종류가 다르면 다른 부품/전선 색 → 일부만 덮였으면 위치 → 레시피 밖에 부품이 있으면 추가. 신뢰도 0.5 미만 탐지는 제외.
+- mm 좌표 방식(초기 설계)은 쓰지 않는다. 아래 DB 표의 mm 컬럼은 V3에서 정리 예정.
 
 ## 3. 저장소 구조
 
@@ -117,10 +133,7 @@ erDiagram
         string product_id FK
         string part_id
         string expected_class
-        float x_mm
-        float y_mm
-        float tolerance_mm
-        string check_mode
+        string holes "V3 예정: Q9,Q10 (현재 스테이션은 JSON 레시피 사용)"
     }
     WORKER {
         string worker_id PK
@@ -131,7 +144,9 @@ erDiagram
         uuid inspection_id PK
         string product_id FK
         string worker_id FK
-        string verdict
+        string verdict "PASS | FAIL | INVALID"
+        string error_code "V3 예정"
+        string station_id "V3 예정"
         int defect_count
         string image_path
         int latency_ms
@@ -140,10 +155,11 @@ erDiagram
     PART_RESULT {
         uuid inspection_id FK
         string part_id
+        string expected_class "V3 예정"
         string detected_class
-        float confidence
-        float offset_mm
         string defect_type
+        string expected_holes "V3 예정"
+        string covered_holes "V3 예정"
     }
     CONFIRMATION {
         uuid confirmation_id PK
@@ -155,7 +171,7 @@ erDiagram
     }
 ```
 
-- `inspection_id`는 스테이션이 생성한다. 같은 ID가 재전송되면 MES는 중복 저장하지 않는다.
+- `inspection_id`는 스테이션이 생성한다. 같은 ID가 재전송되면 MES는 중복 저장하지 않는다 (409). 요청 형식은 `docs/api-contract.md`의 "검사 기록 API".
 - 확인 기록은 덮어쓰지 않고 추가만 한다 (감사 추적).
 - 이미지는 DB에 넣지 않고 경로만 저장한다.
 
@@ -171,8 +187,45 @@ erDiagram
 - API나 데이터 모양을 바꿀 때는 `docs/api-contract.md`를 먼저 고치고 팀에 알린다.
 
 **커밋 메시지**
-- `[station] 검사 결과 화면 추가`, `[mes] 검사 기록 저장 API` 처럼 모듈을 앞에 붙인다.
+- `[station] MVP-7 검사 결과 화면 추가`, `[mes] MVP-25 검사 기록 저장 API` 처럼 모듈과 Jira 키를 앞에 붙인다 (Jira에 커밋이 자동 연결됨).
 
 ## 7. 실행 방법
 
-각 모듈 준비가 끝나면 채운다.
+켜는 순서: **추론 → 스테이션 → HMI** (MES는 따로. 꺼져 있어도 검사는 된다)
+
+**추론 서비스 (8001)** — PowerShell
+```powershell
+cd <저장소>
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy RemoteSigned
+.\.venv\Scripts\Activate.ps1
+$env:Path += ";C:\Program Files\Tesseract-OCR"
+cd inference\app
+uvicorn main:app --port 8001
+```
+- torch는 CPU용이어야 한다 (`pip show torch` → `+cpu`). GPU용은 보안 정책에 막힌다.
+- 서버를 켠 뒤 첫 검사는 모델 로딩 때문에 6~7초. 시연 전에 한 번 돌려 둔다.
+
+**스테이션 (5215)**
+```powershell
+cd station\Inspection.Station
+dotnet run
+```
+- MES 전송은 `appsettings.json`의 `Mes:Enabled`, 주소는 `Mes:BaseUrl`.
+
+**HMI**
+```powershell
+cd station\Inspection.Hmi
+dotnet run
+```
+- 카메라 번호는 [카메라 전환]으로 찾아 `appsettings.json`의 `Camera:Index`에 기록. 카메라가 없으면 [사진 열기].
+- Visual Studio와 dotnet run을 동시에 쓰지 않는다 (실행 중인 프로그램이 파일을 잠가 빌드 실패).
+
+**MES (8080)** — PostgreSQL에 `pcb_aoi` DB 생성 후
+```powershell
+cd mes\pcb_manage
+.\gradlew.bat bootRun
+```
+
+**촬영 기준**
+- 폰은 탑뷰 스탠드에 고정, 보드 번호 10이 화면 위. 검사 영역(번호 10~30 × 양쪽 레일)이 HMI의 노란 점선을 꽉 채우게.
+- Camo 좌우 반전 끄기, 초점·노출 잠금. 연결은 USB 또는 폰 핫스팟.
