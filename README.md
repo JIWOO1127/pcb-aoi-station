@@ -79,10 +79,10 @@ pcb-aoi-station/
 │   ├── app/                      FastAPI 추론 서비스
 │   ├── training/                 학습 스크립트
 │   └── requirements.txt
-├── mes/                          Java · 백엔드 담당
+├── mes/pcb_manage/               Java · 백엔드 담당
 │   ├── src/main/java/...         Spring Boot
 │   ├── src/main/resources/db/    DB 마이그레이션 SQL
-│   └── build.gradle
+│   └── build.gradle.kts
 └── web/                          React · 관리자 웹
 ```
 
@@ -126,6 +126,10 @@ erDiagram
         string worker_id PK
         string name
         string pin_hash
+        string role
+        string admin_role
+        boolean active
+        timestamp last_login_at
     }
     INSPECTION {
         uuid inspection_id PK
@@ -159,7 +163,19 @@ erDiagram
 - 확인 기록은 덮어쓰지 않고 추가만 한다 (감사 추적).
 - 이미지는 DB에 넣지 않고 경로만 저장한다.
 
-## 6. 작업 규칙
+## 6. 사용자 인증과 관리
+
+- 사번과 PIN으로 로그인하며 PIN은 BCrypt 해시로만 저장한다.
+- 로그인 성공 시 1시간 유효한 HS256 JWT를 발급하고 최근 로그인 시각을 기록한다.
+- 관리자 웹 Role은 `ADMIN`, `ENGINEER`, `VIEWER`로 구분한다.
+- 사용자 조회·추가·수정·활성화·비활성화·PIN 초기화와 감사 로그 조회는 `ADMIN`만 가능하다.
+- 계정이 비활성화되거나 Role이 변경되면 기존 JWT도 다음 요청부터 거부한다.
+- 현재 로그인한 관리자와 마지막 활성 관리자는 관리자 권한 해제 또는 비활성화가 불가능하다.
+- 로그인과 사용자 변경 이력은 `audit_log`에 기록하며 PIN 원문은 남기지 않는다.
+
+세부 요청·응답 형식은 [API 계약서](docs/api-contract.md)를 참고한다.
+
+## 7. 작업 규칙
 
 **브랜치**
 - `main`: 항상 실행 가능한 상태. 직접 푸시 금지.
@@ -173,6 +189,37 @@ erDiagram
 **커밋 메시지**
 - `[station] 검사 결과 화면 추가`, `[mes] 검사 기록 저장 API` 처럼 모듈을 앞에 붙인다.
 
-## 7. 실행 방법
+## 8. 실행 방법
 
-각 모듈 준비가 끝나면 채운다.
+### MES 서버
+
+Java 17 이상과 PostgreSQL이 필요하다. 기본 접속 정보는 `mes/pcb_manage/src/main/resources/application.properties`에 있으며 운영 환경에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`을 설정한다.
+
+```powershell
+cd mes/pcb_manage
+.\gradlew.bat bootRun
+```
+
+테스트:
+
+```powershell
+cd mes/pcb_manage
+.\gradlew.bat test
+```
+
+### 관리자 웹
+
+Node.js 설치 후 실행한다. API 주소를 지정하지 않으면 `http://localhost:8080/api`를 사용한다.
+
+```powershell
+cd web
+npm install
+npm run dev
+```
+
+프로덕션 빌드:
+
+```powershell
+cd web
+npm run build
+```

@@ -1,11 +1,59 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download } from 'lucide-react';
-import { auditLogs } from '../mocks/data';
-import { DataTable, Field, PageHeader, SearchFilter } from '../components/UI';
+import { auditService } from '../services/api';
+import { DataTable, Field, LoadingState, PageHeader, SearchFilter } from '../components/UI';
+
+const emptyFilters = { actorId: '', action: '', from: '', to: '' };
 
 export default function AuditLogsPage() {
-  const [action, setAction] = useState('');
-  const rows = useMemo(() => auditLogs.filter((x) => !action || x.action === action), [action]);
-  const columns = [{ key: 'time', label: 'Timestamp' }, { key: 'user', label: 'User' }, { key: 'action', label: 'Action', render: (v) => <code className="audit-action">{v}</code> }, { key: 'target', label: 'Target' }, { key: 'before', label: 'Before', render: (v) => <span className="change-before">{v}</span> }, { key: 'after', label: 'After', render: (v) => <span className="change-after">{v}</span> }];
-  return <><PageHeader eyebrow="SYSTEM MANAGEMENT" title="감사 로그" description="관리자와 엔지니어의 주요 변경 작업을 추적합니다." action={<button className="btn btn-ghost"><Download size={15} /> 로그 내보내기</button>} /><SearchFilter onReset={() => setAction('')}><Field label="기간"><div className="date-range"><input type="date" defaultValue="2026-09-21" /><span>—</span><input type="date" defaultValue="2026-09-27" /></div></Field><Field label="사용자"><select><option>전체 사용자</option><option>김민준</option><option>이서연</option></select></Field><Field label="Action"><select value={action} onChange={(e) => setAction(e.target.value)}><option value="">전체 Action</option><option>LOGIN</option><option>PRODUCT_UPDATE</option><option>RECIPE_UPDATE</option><option>RECIPE_ACTIVATE</option><option>MODEL_ACTIVATE</option><option>USER_UPDATE</option></select></Field></SearchFilter><div className="panel table-panel"><DataTable columns={columns} rows={rows} /></div></>;
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [filters, setFilters] = useState(emptyFilters);
+
+  const load = async (nextFilters = filters) => {
+    setLoading(true); setError('');
+    try {
+      setRows(await auditService.list({
+        ...nextFilters,
+        from: nextFilters.from ? `${nextFilters.from}T00:00:00+09:00` : '',
+        to: nextFilters.to ? `${nextFilters.to}T23:59:59+09:00` : '',
+        size: 100,
+      }));
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
+  };
+
+  useEffect(() => { load(emptyFilters); }, []);
+
+  const resetFilters = () => { setFilters(emptyFilters); load(emptyFilters); };
+  const exportCsv = () => {
+    const escape = (value) => `"${String(value ?? '').replaceAll('"', '""')}"`;
+    const records = rows.map((row) => [new Date(row.occurredAt).toLocaleString('ko-KR'), row.actorId, row.action, row.targetType, row.targetId, row.details]);
+    const csv = [['Timestamp', '사용자', 'Action', '대상 유형', '대상', '변경 내용'], ...records].map((record) => record.map(escape).join(',')).join('\r\n');
+    const url = URL.createObjectURL(new Blob([`\uFEFF${csv}`], { type: 'text/csv;charset=utf-8' }));
+    const link = document.createElement('a');
+    link.href = url; link.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`; link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const columns = [
+    { key: 'occurredAt', label: 'Timestamp', render: (value) => new Date(value).toLocaleString('ko-KR') },
+    { key: 'actorId', label: '사용자' },
+    { key: 'action', label: 'Action', render: (value) => <code className="audit-action">{value}</code> },
+    { key: 'targetType', label: '대상 유형' },
+    { key: 'targetId', label: '대상' },
+    { key: 'details', label: '변경 내용' },
+  ];
+
+  return <>
+    <PageHeader eyebrow="SYSTEM MANAGEMENT" title="감사 로그" description="관리자의 주요 변경 작업과 사용자 로그인을 추적합니다." action={<button className="btn btn-ghost" disabled={!rows.length} onClick={exportCsv}><Download size={15} /> CSV 내보내기</button>} />
+    <SearchFilter onSearch={() => load()} onReset={resetFilters}>
+      <Field label="기간"><div className="date-range"><input type="date" value={filters.from} onChange={(event) => setFilters({ ...filters, from: event.target.value })} /><span>—</span><input type="date" value={filters.to} onChange={(event) => setFilters({ ...filters, to: event.target.value })} /></div></Field>
+      <Field label="사용자 사번"><input value={filters.actorId} onChange={(event) => setFilters({ ...filters, actorId: event.target.value })} placeholder="전체 사용자" /></Field>
+      <Field label="Action"><select value={filters.action} onChange={(event) => setFilters({ ...filters, action: event.target.value })}><option value="">전체 Action</option><option>LOGIN</option><option>USER_CREATE</option><option>USER_UPDATE</option><option>USER_PASSWORD_RESET</option></select></Field>
+    </SearchFilter>
+    {error && <div className="info-banner"><b>API 오류</b>{error}</div>}
+    {loading ? <LoadingState /> : <div className="panel table-panel"><DataTable columns={columns} rows={rows} pageSize={20} /></div>}
+  </>;
 }
