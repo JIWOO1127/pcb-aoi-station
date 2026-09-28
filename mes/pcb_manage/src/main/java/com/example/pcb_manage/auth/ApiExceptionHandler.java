@@ -10,6 +10,8 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.pcb_manage.recipe.RecipeDraftException;
+
 @RestControllerAdvice
 public class ApiExceptionHandler {
     @ExceptionHandler(InvalidCredentialsException.class)
@@ -28,6 +30,16 @@ public class ApiExceptionHandler {
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<Map<String, Object>> responseStatus(ResponseStatusException exception) {
         return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
+    }
+
+    @ExceptionHandler(RecipeDraftException.class)
+    public ResponseEntity<Map<String, Object>> recipeDraft(RecipeDraftException exception) {
+        return ResponseEntity.status(exception.status()).body(Map.of(
+                "timestamp", Instant.now().toString(),
+                "status", exception.status().value(),
+                "error", exception.status().getReasonPhrase(),
+                "code", exception.code(),
+                "message", exception.getMessage()));
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {
