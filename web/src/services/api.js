@@ -25,6 +25,7 @@ export const productService = { list: () => delay(data.products), get: (id) => d
 export const recipeService = {
   list: () => request('/recipes'),
   get: (id) => request(`/recipes/${id}`),
+  create: (recipe) => request('/recipes', { method: 'POST', body: JSON.stringify(recipe) }),
 };
 export const inspectionService = {
   list: (filters = {}) => request(`/inspections?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString()}`),
