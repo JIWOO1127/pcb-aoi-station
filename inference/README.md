@@ -35,14 +35,15 @@ flowchart TD
     CROPY --> YOLO
 
     subgraph S2["2. 부품 탐지 — main.py detect_parts"]
-        YOLO[YOLO(yolo8n.pt) 추론<br/>픽셀 박스 + 종류·신뢰도]
+        YOLO[YOLO(yolo8n.pt) 추론<br/>픽셀 박스 + 종류·신뢰도] --> DEDUP[중복 박스 제거<br/>겹침 IoU≥0.5면<br/>신뢰도 높은 것만 유지]
     end
 
-    HOLES --> MATCH[3. 홀-박스 대조<br/>board.match_holes_to_boxes]
-    YOLO --> MATCH
+    HOLES --> MATCH[3. 홀-박스 대조<br/>board.match_holes_to_boxes<br/>부품별 다리 개수만큼만 인정]
+    DEDUP --> MATCH
     MATCH --> OUT[가려진 홀만 추려서<br/>parts 배열로 응답]
 
     style DETECT fill:#d4f4dd,stroke:#2e7d32
+    style DEDUP fill:#d4f4dd,stroke:#2e7d32
     style HOLES fill:#d4f4dd,stroke:#2e7d32
     style MATCH fill:#d4f4dd,stroke:#2e7d32
     style ORIENT fill:#d4f4dd,stroke:#2e7d32
@@ -148,16 +149,33 @@ OCR로 읽어서, 그걸 행 위치 계산의 1차 기준점(앵커)으로 직�
 ### 3. 홀-박스 대조 (`board.py`)
 
 "박스 중심과 가장 가까운 핀홀 하나"를 고르는 대신, 반대로 **핀홀마다 어떤 박스 안에
-들어가는지**를 본다. 저항처럼 다리(핀) 두 개짜리 부품이 핀홀 두 개에 걸쳐 있어도 둘
-다 자연스럽게 잡힌다. LED·커패시터처럼 몸통이 여러 핀홀 위에 걸쳐 보이는 둥근 부품은
-박스 중심에 가장 가까운 2개(다리 개수만큼)만 실제 장착으로 인정한다. 가려진(=장착된)
-핀홀만 골라 `{pinhole, class, confidence}` 배열로 응답한다.
+들어가는지**를 본다. 박스 안에는 부품 몸통 크기 때문에 실제 다리 개수보다 핀홀이 더
+많이 잡힐 수 있어서, 부품 종류별로 "그중 실제 다리가 꽂힌 핀홀"만 거르는 규칙을 둔다:
+
+| 부품 종류 | 다리 개수 | 거르는 방법 |
+|---|---|---|
+| `led`, `capacitor` | 2 | 몸통이 둥글어 여러 핀홀에 걸치지만 다리는 몸통 중심 바로 아래로 나온다 → **박스 중심에서 가장 가까운 2개** |
+| `black_wire`, `red_wire`, `white_wire`, `resistance330`, `resistance470` | 2 | 길쭉한 몸통 양 끝에만 다리가 있다 → 박스의 긴 축(가로/세로 중 더 긴 쪽) 방향으로 정렬해서 **양 끝 2개** |
+| `ic_chip` | 14 | 다리가 몸통 양옆(가장 바깥쪽 두 열)에만 있다 — 중간 열은 몸통에 가려진 빈 핀홀이다 → 후보를 바깥쪽 두 열로 먼저 좁힌 뒤 **박스 중심에서 가장 가까운 14개** |
+
+가려진(=다리가 꽂힌) 핀홀만 골라 `{pinhole, class, confidence}` 배열로 응답한다. 부품
+하나가 다리를 여러 개 쓰면 그 개수만큼 배열 원소가 나뉘어 나온다 (API 계약은
+[docs/api-contract.md](../docs/api-contract.md) 참고).
+
+**같은 부품의 중복 탐지 제거 (`main.py`의 `_deduplicate_boxes`)**: YOLO가 부품 하나를
+박스 여러 개로 중복 탐지하면(실측: IC칩 하나가 신뢰도 0.96/0.28 박스 2개로, 저항 하나가
+`resistance470`(0.70)/`resistance330`(0.47) 박스 2개로 잡힌 사례), 위 다리 거르기가
+박스 단위로 동작하기 때문에 박스마다 따로 다리를 채워서 실제보다 더 많은 핀홀이 장착된
+것처럼 나올 수 있다. 그래서 다리를 거르기 전에, **겹침 비율(IoU)이 0.5 이상인 박스는
+클래스가 달라도** 신뢰도가 가장 높은 것만 남기고 나머지는 버린다 — 실제 부품은 한
+자리에 하나만 있을 수 있으므로, 위치가 거의 같으면 YOLO가 클래스를 다르게 헷갈렸어도
+같은 물체의 중복 탐지로 본다.
 
 ## 파일 구성
 
 | 파일 | 역할 | 상태 |
 |---|---|---|
-| [app/main.py](app/main.py) | FastAPI 앱. `/health`, `/infer`, `/infer/debug`(임시 테스트용) 엔드포인트, YOLO 로딩·추론, 전체 파이프라인 조립 | 완성 |
+| [app/main.py](app/main.py) | FastAPI 앱. `/health`, `/infer`, `/infer/debug`(임시 테스트용) 엔드포인트, YOLO 로딩·추론, 중복 박스 제거(`_deduplicate_boxes`), 전체 파이프라인 조립 | 완성 |
 | [app/roi.py](app/roi.py) | 방향 판별 + 미세 회전 보정 후, 가로·세로 크롭과 라벨 앵커 조립 | 완성 |
 | [app/rail_detect.py](app/rail_detect.py) | 레일 선 색상 검출로 가로 크롭 범위 + 기울기 측정 | 완성 |
 | [app/label_detect.py](app/label_detect.py) | 행 번호 라벨 OCR로 세로 크롭 범위 + 행 앵커 계산 | 완성 |
@@ -197,5 +215,11 @@ YOLO 추론에는 `ultralytics`가 필요하다 (`pip install ultralytics`). 모
 - 크롭 여백을 너무 넉넉히 주면(레일 열의 마지막 홀 하나를 더 담으려고 시도했던 것)
   사진에 따라 위아래 인접 보드 유닛의 내용까지 크롭에 딸려 들어올 수 있어, 지금은
   다소 보수적인 여백을 쓴다 — 아주 드물게 레일 열의 마지막 홀 하나를 놓칠 수 있다.
+- `_deduplicate_boxes`는 **겹침(IoU 0.5 이상)이 있는 박스만** 같은 물체의 중복으로 본다.
+  YOLO가 같은 물체를 놓고 클래스만 헷갈린 게 아니라, 완전히 다른 자리에서 아예 다른
+  종류로 잘못 인식하는 경우(실측: 전선 하나가 별도 위치에서 `ic_chip`으로도 잘못
+  탐지된 사례)는 겹침이 없어서 이 로직으로 걸러지지 않는다. 여러 YOLO 모델(yolo8n/
+  yolov9m/yolo12m/yolo26m)을 실측 비교했을 때도 이런 클래스 오분류가 종종 관찰됐다 —
+  근본적으로는 학습 데이터·모델 품질 문제라 후처리만으로 완전히 해결하기는 어렵다.
 
 세션별 상세 진행 기록(시행착오, 실측 수치, 버그 원인)은 [WORKLOG.md](WORKLOG.md) 참고.
