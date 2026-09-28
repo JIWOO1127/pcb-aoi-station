@@ -54,6 +54,38 @@
 
 `GET /api/admin/audit-logs`는 `ADMIN` JWT가 필요하며 `actorId`, `action`, `from`, `to`, `page`, `size`로 필터링할 수 있다.
 
+## 관리자 웹 → MES : 레시피 관리
+
+레시피 조회는 로그인 사용자에게 허용하고 생성은 `ADMIN`, `ENGINEER` JWT에만 허용한다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/recipes` | 모든 레시피 버전 조회 |
+| `GET` | `/api/recipes/{recipeId}` | 부품 기준을 포함한 레시피 상세 조회 |
+| `POST` | `/api/recipes` | 새 레시피 버전 생성 (`201 Created`) |
+
+```json
+{
+  "productId": "NE555-B",
+  "version": 4,
+  "note": "핀홀 기준 변경",
+  "parts": [
+    {
+      "partId": "R1",
+      "expectedClass": "resistance330",
+      "holes": ["E9", "H9"]
+    }
+  ]
+}
+```
+
+- `recipeId`는 MES가 생성한다.
+- 제품은 활성 제품으로 등록되어 있어야 한다.
+- 제품과 버전 조합 및 한 레시피 안의 `partId`는 중복될 수 없다.
+- 홀은 `A0`~`U13` 형식이며 같은 부품에 중복 입력할 수 없다.
+- 저장된 새 버전이 활성화되고 해당 제품의 기존 활성 버전은 비활성화된다.
+- 생성 이력은 `RECIPE_CREATE` 감사 로그로 남는다.
+
 ## 스테이션 → 추론 서비스 : `POST /infer`
 
 ### 요청

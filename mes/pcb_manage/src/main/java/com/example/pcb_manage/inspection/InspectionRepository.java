@@ -55,16 +55,25 @@ public class InspectionRepository {
                 .param("expectedHoles", json(p.expectedHoles())).param("coveredHoles", json(p.coveredHoles())).update();
     }
     public List<InspectionSummary> list(String verdict, String productId, String stationId) {
-        return jdbc.sql("""
+        StringBuilder sql = new StringBuilder("""
                 SELECT i.inspection_id,i.recipe_id,r.version AS recipe_version,i.station_id,i.product_id,i.worker_id,
                        i.verdict,i.defect_count,i.error_code,i.latency_ms,i.captured_at
                 FROM inspection i JOIN recipe r ON r.recipe_id=i.recipe_id
-                WHERE (:verdict IS NULL OR i.verdict=:verdict)
-                  AND (:productId IS NULL OR i.product_id=:productId)
-                  AND (:stationId IS NULL OR i.station_id=:stationId)
-                ORDER BY i.captured_at DESC LIMIT 500
-                """).param("verdict", blankToNull(verdict)).param("productId", blankToNull(productId)).param("stationId", blankToNull(stationId))
-                .query((rs, n) -> new InspectionSummary(rs.getObject("inspection_id", UUID.class), rs.getObject("recipe_id", UUID.class),
+                WHERE 1=1
+                """);
+        String normalizedVerdict = blankToNull(verdict);
+        String normalizedProductId = blankToNull(productId);
+        String normalizedStationId = blankToNull(stationId);
+        if (normalizedVerdict != null) sql.append(" AND i.verdict=:verdict");
+        if (normalizedProductId != null) sql.append(" AND i.product_id=:productId");
+        if (normalizedStationId != null) sql.append(" AND i.station_id=:stationId");
+        sql.append(" ORDER BY i.captured_at DESC LIMIT 500");
+
+        JdbcClient.StatementSpec statement = jdbc.sql(sql.toString());
+        if (normalizedVerdict != null) statement = statement.param("verdict", normalizedVerdict);
+        if (normalizedProductId != null) statement = statement.param("productId", normalizedProductId);
+        if (normalizedStationId != null) statement = statement.param("stationId", normalizedStationId);
+        return statement.query((rs, n) -> new InspectionSummary(rs.getObject("inspection_id", UUID.class), rs.getObject("recipe_id", UUID.class),
                         rs.getInt("recipe_version"), rs.getString("station_id"), rs.getString("product_id"), rs.getString("worker_id"),
                         rs.getString("verdict"), rs.getInt("defect_count"), rs.getString("error_code"), rs.getInt("latency_ms"),
                         rs.getObject("captured_at", OffsetDateTime.class))).list();
