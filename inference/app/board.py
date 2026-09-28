@@ -110,35 +110,68 @@ _ELONGATED_PART_CLASSES = {"black_wire", "red_wire", "white_wire", "resistance33
 _ELONGATED_PART_LEG_COUNT = 2
 
 
-def match_holes_to_boxes(holes: list[Hole], boxes: list[DetectedBox]) -> None:
-    """각 홀의 기대 픽셀 위치가 어떤 박스 안에 들어가는지 보고, 그 홀을 채운다.
+@dataclass
+class BoxGroup:
+    """박스 하나 = 부품 하나와, 그 박스에 배정된 다리 홀 (레시피 초안용)."""
 
-    holes를 제자리에서 수정한다 (반환값 없음).
+    box: DetectedBox
+    holes: list[Hole]  # 이 박스가 다리로 가져간 홀 (match_holes_to_boxes와 같은 결과)
+    # 다른 박스가 먼저 가져가서 이 박스가 못 받은 "원래 다리 후보" 홀.
+    # 비어 있지 않으면 두 부품의 다리 자리가 겹친다는 뜻 (레시피 초안의 HOLE_OVERLAP 근거).
+    contested: list[Hole]
+
+
+def _select_legs(box: DetectedBox, contained: list[Hole]) -> list[Hole]:
+    """박스 안 후보 홀 중 실제 다리로 볼 홀을 고른다 (부품 종류별 규칙)."""
+    contained = list(contained)
+    if not contained:
+        return contained
+
+    if box.part_class == _IC_CHIP_CLASS:
+        min_col = min(hole.col for hole in contained)
+        max_col = max(hole.col for hole in contained)
+        contained = [hole for hole in contained if hole.col in (min_col, max_col)]
+        cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
+        contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
+        contained = contained[:_IC_CHIP_LEG_COUNT]
+    elif box.part_class in _LEG_COUNT_BY_NEAREST_CENTER:
+        cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
+        contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
+        contained = contained[:_LEG_COUNT_BY_NEAREST_CENTER[box.part_class]]
+    elif box.part_class in _ELONGATED_PART_CLASSES and len(contained) > _ELONGATED_PART_LEG_COUNT:
+        horizontal = (box.x2 - box.x1) >= (box.y2 - box.y1)
+        axis_key = (lambda hole: hole.pixel[0]) if horizontal else (lambda hole: hole.pixel[1])
+        contained.sort(key=axis_key)
+        contained = [contained[0], contained[-1]]
+    return contained
+
+
+def match_holes_to_boxes_grouped(holes: list[Hole], boxes: list[DetectedBox]) -> list[BoxGroup]:
+    """match_holes_to_boxes와 똑같이 holes를 채우고, 박스별 다리 묶음도 돌려준다.
+
+    /recipe-draft처럼 "어느 홀들이 같은 부품인지"가 필요한 곳에서 쓴다.
+    boxes와 같은 순서로 BoxGroup을 하나씩 돌려준다 (다리를 하나도 못 받은 박스는 holes가 빈 목록).
     """
+    groups = []
     for box in boxes:
-        contained = [hole for hole in holes if hole.part_class is None and box.contains(*hole.pixel)]
-        if not contained:
-            continue
+        legs = _select_legs(box, [hole for hole in holes if hole.part_class is None and box.contains(*hole.pixel)])
 
-        if box.part_class == _IC_CHIP_CLASS:
-            min_col = min(hole.col for hole in contained)
-            max_col = max(hole.col for hole in contained)
-            contained = [hole for hole in contained if hole.col in (min_col, max_col)]
-            cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
-            contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
-            contained = contained[:_IC_CHIP_LEG_COUNT]
-        elif box.part_class in _LEG_COUNT_BY_NEAREST_CENTER:
-            cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
-            contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
-            contained = contained[:_LEG_COUNT_BY_NEAREST_CENTER[box.part_class]]
-        elif box.part_class in _ELONGATED_PART_CLASSES and len(contained) > _ELONGATED_PART_LEG_COUNT:
-            horizontal = (box.x2 - box.x1) >= (box.y2 - box.y1)
-            axis_key = (lambda hole: hole.pixel[0]) if horizontal else (lambda hole: hole.pixel[1])
-            contained.sort(key=axis_key)
-            contained = [contained[0], contained[-1]]
-
-        for hole in contained:
+        for hole in legs:
             hole.part_class = box.part_class
             hole.confidence = box.confidence
             # 박스 두 개가 겹쳐서 같은 홀을 덮는 경우는 드묾 -> 먼저 찾은 박스 사용
             # (hole.part_class is None 조건으로 이미 걸러짐)
+
+        # 주인과 상관없이 골랐다면 다리였을 홀 중, 이미 다른 박스가 가져간 홀
+        ideal = _select_legs(box, [hole for hole in holes if box.contains(*hole.pixel)])
+        contested = [hole for hole in ideal if hole not in legs and hole.part_class is not None]
+        groups.append(BoxGroup(box=box, holes=legs, contested=contested))
+    return groups
+
+
+def match_holes_to_boxes(holes: list[Hole], boxes: list[DetectedBox]) -> None:
+    """각 홀의 기대 픽셀 위치가 어떤 박스 안에 들어가는지 보고, 그 홀을 채운다.
+
+    holes를 제자리에서 수정한다 (반환값 없음). 박스별 묶음이 필요하면 match_holes_to_boxes_grouped.
+    """
+    match_holes_to_boxes_grouped(holes, boxes)
