@@ -161,4 +161,41 @@ def detect_parts(roi_image: np.ndarray) -> List[DetectedBox]:
                 confidence=float(box.conf[0]),
             )
         )
-    return boxes
+    return _deduplicate_boxes(boxes)
+
+
+_DUPLICATE_IOU_THRESHOLD = 0.5
+
+
+def _iou(a: DetectedBox, b: DetectedBox) -> float:
+    """두 박스의 IoU(겹침 비율, 0~1)를 계산한다."""
+    ix1, iy1 = max(a.x1, b.x1), max(a.y1, b.y1)
+    ix2, iy2 = min(a.x2, b.x2), min(a.y2, b.y2)
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    if inter == 0.0:
+        return 0.0
+    area_a = (a.x2 - a.x1) * (a.y2 - a.y1)
+    area_b = (b.x2 - b.x1) * (b.y2 - b.y1)
+    return inter / (area_a + area_b - inter)
+
+
+def _deduplicate_boxes(boxes: List[DetectedBox]) -> List[DetectedBox]:
+    """같은 부품 하나를 YOLO가 박스 여러 개로 중복 탐지하는 경우, 신뢰도가
+    가장 높은 박스만 남긴다. 겹침 비율(`_DUPLICATE_IOU_THRESHOLD` 이상)만 보고
+    판단한다 — 클래스는 같은지 확인 안 한다. 실제 부품은 한 자리에 하나만
+    있을 수 있으니, 박스 위치가 거의 같으면 클래스가 다르게 잡혔어도(YOLO가
+    같은 물체를 헷갈린 것) 같은 물체의 중복 탐지로 본다.
+
+    YOLO 자체 NMS(기본 IoU 0.7)가 이미 걸러내지만, 부품이 크고 각도가
+    미묘하게 다른 두 박스로 잡히면 IoU가 0.7보다 낮게 나와 통과할 수 있다
+    (실측: IC칩 하나가 신뢰도 0.96/0.28 박스 2개로 잡힌 사례, IoU≈0.69).
+    클래스까지 다르게 헷갈린 사례도 실측됨: board4의 저항 하나가 신뢰도
+    0.70(resistance470)/0.47(resistance330) 박스 2개로 잡혀서, 클래스가
+    같을 때만 중복으로 보던 예전 버전은 이 경우를 놓쳤다.
+    """
+    kept: List[DetectedBox] = []
+    for box in sorted(boxes, key=lambda b: b.confidence, reverse=True):
+        if any(_iou(box, other) >= _DUPLICATE_IOU_THRESHOLD for other in kept):
+            continue
+        kept.append(box)
+    return kept
