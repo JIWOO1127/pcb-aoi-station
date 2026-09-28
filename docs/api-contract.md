@@ -31,6 +31,28 @@
 - 이후 요청은 `Authorization: Bearer {accessToken}` 헤더를 사용한다.
 - 사번이 없거나, 비활성 계정이거나, PIN이 틀리면 동일하게 `401 Unauthorized`를 반환한다.
 - 운영 환경에서는 MES와 스테이션에 동일한 `JWT_SECRET`(32바이트 이상)을 안전하게 설정한다.
+- 계정이 비활성화되거나 Role이 변경되면 기존 JWT도 다음 요청부터 사용할 수 없다.
+
+## 관리자 웹 → MES : 사용자 관리
+
+모든 사용자 관리 API는 `ADMIN` JWT가 필요하다.
+
+| Method | Path | 설명 |
+|---|---|---|
+| `GET` | `/api/admin/users` | 관리자 웹 사용자 목록과 최근 로그인 시각 조회 |
+| `POST` | `/api/admin/users` | 사용자 생성 |
+| `PUT` | `/api/admin/users/{employeeId}` | 이름, Role, 활성 상태 변경 |
+| `POST` | `/api/admin/users/{employeeId}/reset-password` | PIN 초기화 (`204 No Content`) |
+
+- Role은 `ADMIN`, `ENGINEER`, `VIEWER` 중 하나다.
+- PIN은 4~64자로 받고 BCrypt 해시만 저장한다.
+- 현재 로그인한 관리자는 자신의 ADMIN 권한을 해제하거나 계정을 비활성화할 수 없다.
+- 마지막 활성 관리자도 비활성화하거나 다른 Role로 변경할 수 없다.
+- 생성, 수정, PIN 초기화는 감사 로그에 기록하며 PIN 원문은 기록하지 않는다.
+
+## 관리자 웹 → MES : 감사 로그
+
+`GET /api/admin/audit-logs`는 `ADMIN` JWT가 필요하며 `actorId`, `action`, `from`, `to`, `page`, `size`로 필터링할 수 있다.
 
 ## 스테이션 → 추론 서비스 : `POST /infer`
 

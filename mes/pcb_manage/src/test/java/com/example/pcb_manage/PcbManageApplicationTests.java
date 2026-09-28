@@ -4,6 +4,8 @@ import static org.hamcrest.Matchers.matchesPattern;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -76,11 +78,57 @@ class PcbManageApplicationTests {
 
 	@Test
 	void adminCanCreateUserAndAuditLogDoesNotContainPassword() {
-		var created = adminUserService.create(new CreateUserRequest("WEB-ADMIN", "웹 관리자", "secret-pin", "ADMIN"), "ROOT");
+		var created = adminUserService.create(new CreateUserRequest("WEB-ADMIN", "웹 관리자", "secret-pin", "ADMIN", true), "ROOT");
 		assertEquals("ADMIN", created.role());
 		var logs = auditLogRepository.list("ROOT", "USER_CREATE", null, null, 0, 20);
 		assertEquals(1, logs.size());
 		org.junit.jupiter.api.Assertions.assertFalse(logs.get(0).details().contains("secret-pin"));
+	}
+
+	@Test
+	void adminUserApiSupportsCreateListResetAndRejectsViewer() throws Exception {
+		insertManagedUser("ADMIN-API", "관리자", "1234", "ADMIN", true);
+		String adminToken = jwtTokenService.createToken(new WorkerAccount("ADMIN-API", "관리자", "unused", "ADMIN", true));
+
+		mockMvc.perform(post("/api/admin/users").header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"employeeId\":\"VIEW-API\",\"name\":\"조회자\",\"password\":\"5678\",\"role\":\"VIEWER\",\"active\":true}"))
+				.andExpect(status().isOk())
+				.andExpect(jsonPath("$.employeeId").value("VIEW-API"));
+		mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + adminToken))
+				.andExpect(status().isOk());
+		mockMvc.perform(post("/api/admin/users/VIEW-API/reset-password").header("Authorization", "Bearer " + adminToken)
+				.contentType(MediaType.APPLICATION_JSON).content("{\"password\":\"9999\"}"))
+				.andExpect(status().isNoContent());
+
+		String viewerToken = jwtTokenService.createToken(new WorkerAccount("VIEW-API", "조회자", "unused", "VIEWER", true));
+		mockMvc.perform(get("/api/admin/users").header("Authorization", "Bearer " + viewerToken))
+				.andExpect(status().isForbidden());
+	}
+
+	@Test
+	void currentAdminCannotDemoteSelfAndDeactivatedTokenIsRejected() throws Exception {
+		insertManagedUser("ADMIN-SELF", "자기관리자", "1234", "ADMIN", true);
+		String token = jwtTokenService.createToken(new WorkerAccount("ADMIN-SELF", "자기관리자", "unused", "ADMIN", true));
+		mockMvc.perform(put("/api/admin/users/ADMIN-SELF").header("Authorization", "Bearer " + token)
+				.contentType(MediaType.APPLICATION_JSON)
+				.content("{\"name\":\"자기관리자\",\"role\":\"VIEWER\",\"active\":true}"))
+				.andExpect(status().isBadRequest());
+
+		jdbcClient.sql("UPDATE worker SET active=false WHERE worker_id='ADMIN-SELF'").update();
+		mockMvc.perform(get("/api/auth/me").header("Authorization", "Bearer " + token))
+				.andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	void successfulLoginRecordsLastLoginTime() throws Exception {
+		insertWorker("A-LAST", "최근로그인", "1234", true);
+		mockMvc.perform(post("/api/auth/login").contentType(MediaType.APPLICATION_JSON)
+				.content("{\"employeeId\":\"A-LAST\",\"pin\":\"1234\"}"))
+				.andExpect(status().isOk());
+		Integer count = jdbcClient.sql("SELECT COUNT(*) FROM worker WHERE worker_id='A-LAST' AND last_login_at IS NOT NULL")
+				.query(Integer.class).single();
+		assertEquals(1, count);
 	}
 
 	private void insertWorker(String workerId, String name, String pin, boolean active) {
@@ -90,5 +138,16 @@ class PcbManageApplicationTests {
 				""")
 				.param("workerId", workerId).param("name", name)
 				.param("pinHash", passwordEncoder.encode(pin)).param("active", active).update();
+	}
+
+	private void insertManagedUser(String workerId, String name, String pin, String role, boolean active) {
+		jdbcClient.sql("""
+				INSERT INTO worker (worker_id, name, pin_hash, role, admin_role, active)
+				VALUES (:workerId, :name, :pinHash, :baseRole, :role, :active)
+				""")
+				.param("workerId", workerId).param("name", name)
+				.param("pinHash", passwordEncoder.encode(pin))
+				.param("baseRole", "ADMIN".equals(role) ? "ADMIN" : "WORKER")
+				.param("role", role).param("active", active).update();
 	}
 }
