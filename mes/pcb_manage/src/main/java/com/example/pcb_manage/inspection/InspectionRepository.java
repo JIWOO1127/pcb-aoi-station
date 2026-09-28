@@ -5,6 +5,7 @@ import static com.example.pcb_manage.inspection.InspectionController.*;
 import java.time.OffsetDateTime;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -25,13 +26,20 @@ public class InspectionRepository {
     public boolean productExists(String id) { return jdbc.sql("SELECT COUNT(*) FROM product WHERE product_id=:id AND active=true").param("id", id).query(Integer.class).single() > 0; }
     public boolean workerExists(String id) { return jdbc.sql("SELECT COUNT(*) FROM worker WHERE worker_id=:id AND active=true").param("id", id).query(Integer.class).single() > 0; }
     public boolean recipeMatches(UUID recipeId, String productId) { return jdbc.sql("SELECT COUNT(*) FROM recipe WHERE recipe_id=:id AND product_id=:productId").param("id", recipeId).param("productId", productId).query(Integer.class).single() > 0; }
+    public Optional<UUID> activeRecipeId(String productId) {
+        return jdbc.sql("""
+                SELECT recipe_id FROM recipe
+                WHERE product_id=:productId AND active=true
+                ORDER BY version DESC LIMIT 1
+                """).param("productId", productId).query(UUID.class).optional();
+    }
 
-    public void insert(CreateInspectionRequest r) {
+    public void insert(CreateInspectionRequest r, UUID recipeId) {
         jdbc.sql("""
                 INSERT INTO inspection(inspection_id,product_id,recipe_id,worker_id,verdict,defect_count,
                     latency_ms,captured_at,station_id,error_code)
                 VALUES(:id,:productId,:recipeId,:workerId,:verdict,:defectCount,:latencyMs,:capturedAt,:stationId,:errorCode)
-                """).param("id", r.inspectionId()).param("productId", r.productId()).param("recipeId", r.recipeId())
+                """).param("id", r.inspectionId()).param("productId", r.productId()).param("recipeId", recipeId)
                 .param("workerId", r.workerId()).param("verdict", r.verdict()).param("defectCount", r.defectCount())
                 .param("latencyMs", r.latencyMs()).param("capturedAt", r.capturedAt()).param("stationId", r.stationId())
                 .param("errorCode", r.errorCode()).update();

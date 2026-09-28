@@ -128,8 +128,8 @@ X-Station-Key: <스테이션 키>
 ```json
 {
   "inspectionId": "3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90",
-  "recipeId": "7bafaa9d-4d9f-4d2e-bc04-0db47d401003",
-  "stationId": "ST-01",
+  "recipeId": null,
+  "stationId": "STATION-01",
   "productId": "NE555-B",
   "workerId": "A-1042",
   "verdict": "FAIL",
@@ -161,8 +161,8 @@ X-Station-Key: <스테이션 키>
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
 | inspectionId | UUID | O | 스테이션이 만든 ID. **중복 판단 기준** |
-| recipeId | UUID | O | 검사에 사용한 레시피 ID. productId와 일치해야 함 |
-| stationId | string | O | 스테이션 이름 (`ST-01`) |
+| recipeId | UUID \| null | - | 스테이션이 UUID를 알면 전달. null이면 MES가 productId의 최신 활성 레시피를 찾아 저장 |
+| stationId | string | O | 스테이션 이름 (`STATION-01`) |
 | productId | string | O | `product` 테이블에 있어야 함 (`NE555-B`) |
 | workerId | string \| null | - | HMI 로그인 사번. **NULL 허용**: 로그인 없이 검사한 경우 null (`inspection.worker_id`도 NULL 허용) |
 | verdict | string | O | `PASS` \| `FAIL` \| `INVALID` (판정 불가) |
@@ -171,13 +171,14 @@ X-Station-Key: <스테이션 키>
 | latencyMs | int | O | 검사 처리 시간 |
 | capturedAt | ISO-8601 (+09:00) | O | 검사 시각 |
 | parts[].partId | string | O | 레시피 부품 ID. 추가 부품은 `EXTRA@B5` |
-| parts[].expectedClass | string | O | 있어야 할 종류. 추가 부품은 `-` |
+| parts[].expectedClass | string \| null | 조건부 | 레시피 부품은 필수. `EXTRA`는 null |
 | parts[].detectedClass | string | - | 실제로 본 종류. 비었으면 null |
 | parts[].defectType | string | - | null(정상) \| `MISSING` \| `WRONG_PART` \| `WIRE_COLOR_SWAP` \| `OFFSET` \| `EXTRA` |
 | parts[].expectedHoles | string[] | O | 레시피 홀. 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 |
 | parts[].coveredHoles | string[] | O | 실제로 덮인 홀. 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 |
 
 `INVALID`이면 `parts`는 빈 배열이다.
+`EXTRA` 부품은 `expectedClass: null`, `expectedHoles: []`로 보낸다.
 
 ### 2. 응답
 
