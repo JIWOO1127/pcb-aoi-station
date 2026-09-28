@@ -131,7 +131,8 @@ public class ManagementService {
 
         Map<String,List<InspectionRow>> byHour = rows.stream().collect(Collectors.groupingBy(
                 row -> String.format("%02d", row.capturedAt().atZoneSameInstant(KST).getHour()), LinkedHashMap::new, Collectors.toList()));
-        List<HourlyPoint> hourly = byHour.entrySet().stream().map(entry -> new HourlyPoint(entry.getKey(), entry.getValue().size(),
+        List<HourlyPoint> hourly = byHour.entrySet().stream().sorted(Map.Entry.comparingByKey())
+                .map(entry -> new HourlyPoint(entry.getKey(), entry.getValue().size(),
                 percent(entry.getValue().stream().filter(row -> "FAIL".equals(row.verdict())).count(), entry.getValue().size()))).toList();
         return new DashboardResponse(stats, hourly, distribution(rows), recent(rows));
     }
