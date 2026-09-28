@@ -323,6 +323,12 @@ public partial class MainViewModel : ObservableObject
                 MesOk = null;
                 MesText = "MES";
             }
+            else if (s.Connected is null && s.Pending == 0)
+            {
+                // 스테이션이 켜진 뒤 아직 한 번도 보내지 않음 → 모름(회색)
+                MesOk = null;
+                MesText = "MES";
+            }
             else if (s.Connected == true && s.Pending == 0)
             {
                 MesOk = true;
