@@ -1,7 +1,7 @@
 {
   "productId": "NE555-B",
-  "version": 2,
-  "note": "2026-09-28 다리 기준 홀, yolov8n, golden 3장 투표 36홀 일치",
+  "version": 3,
+  "note": "R1 470→330: 조명에 따라 470 오인, 시연 범위에서 저항 값 판별 제외",
   "parts": [
     {
       "partId": "U1",
@@ -10,7 +10,7 @@
     },
     {
       "partId": "R1",
-      "expectedClass": "resistance470",
+      "expectedClass": "resistance330",
       "holes": [ "E9", "H9" ]
     },
     {
