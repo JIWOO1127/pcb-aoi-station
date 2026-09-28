@@ -34,10 +34,10 @@ public class MesOptions
     public string OutboxFolder { get; set; } = "mes-outbox";
 
     /// <summary>
-    /// 로그인할 때 MES의 활성 레시피를 받아 Recipes 폴더를 갱신할지.
-    /// 끄면(기본) 지금처럼 로컬 레시피 파일만 쓴다. 켜도 MES가 안 되면 로컬 파일로 그대로 검사한다.
+    /// 로그인할 때 MES의 승인(활성) 레시피를 받아 recipes-cache에 둘지 (원본 Recipes 폴더는 건드리지 않는다).
+    /// 끄면 원본 레시피 파일만 쓰고 /api/login의 recipeSync는 빈 목록. 켜도 MES가 안 되면 지금 레시피로 그대로 검사한다.
     /// </summary>
-    public bool RecipeSyncEnabled { get; set; } = false;
+    public bool RecipeSyncEnabled { get; set; } = true;
 
     /// <summary>MES 레시피 API 경로 (목록 GET {경로}, 상세 GET {경로}/{recipeId}). 작업자 JWT로 호출한다.</summary>
     public string RecipesPath { get; set; } = "/api/recipes";

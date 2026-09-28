@@ -5,20 +5,21 @@ using Microsoft.Extensions.Options;
 namespace Inspection.Station.Controllers;
 
 /// <summary>
-/// GET /api/recipes/status — 지금 레시피 파일들이 MES의 어느 레시피에서 왔는지 (나중에 HMI 알림용).
-///   { syncEnabled, lastSync: { at, updated, skipped, failed, error } | null, recipes: { productId: { recipeId, version, syncedAt } } }
+/// GET /api/recipes/status — MES에서 받아 둔 레시피(recipes-cache)와 마지막 동기화 결과. 확인용.
+///   { syncEnabled, lastSync: { at, items:[{ productId, status, version, recipeId, approvedBy, approvedAt }] } | null,
+///     cache: { productId: { productId, version, recipeId, approvedBy, approvedAt, syncedAt, ... } } }
 /// </summary>
 [ApiController]
 [Route("api/recipes")]
 public class RecipesController : ControllerBase
 {
-    private readonly RecipeMetaStore _meta;
+    private readonly RecipeCache _cache;
     private readonly RecipeSyncService _sync;
     private readonly MesOptions _options;
 
-    public RecipesController(RecipeMetaStore meta, RecipeSyncService sync, IOptions<MesOptions> options)
+    public RecipesController(RecipeCache cache, RecipeSyncService sync, IOptions<MesOptions> options)
     {
-        _meta = meta;
+        _cache = cache;
         _sync = sync;
         _options = options.Value;
     }
@@ -28,6 +29,6 @@ public class RecipesController : ControllerBase
     {
         syncEnabled = _options.RecipeSyncEnabled,
         lastSync = _sync.LastResult,
-        recipes = _meta.Snapshot(),
+        cache = _cache.Snapshot(),
     });
 }

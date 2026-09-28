@@ -4,8 +4,19 @@ namespace Inspection.Hmi.Services;
 
 public enum LoginStatus { Ok, InvalidCredentials, Unavailable }
 
-/// <summary>로그인 시도 결과. Unavailable이면 HMI가 오프라인 로그인을 시도한다.</summary>
-public record LoginOutcome(LoginStatus Status, LoginResult? Worker, string? Message = null);
+/// <summary>
+/// 로그인 시도 결과. Unavailable이면 HMI가 오프라인 로그인을 시도한다.
+/// RecipeSync: 스테이션이 로그인 때 MES 레시피를 맞춰 본 결과 (/api/login 200·503 응답의 recipeSync). 모르면 빈 목록.
+/// </summary>
+public record LoginOutcome(LoginStatus Status, LoginResult? Worker, string? Message = null,
+    IReadOnlyList<RecipeSyncItem>? RecipeSync = null);
+
+/// <summary>
+/// /api/login 응답 recipeSync[] 한 줄. status: UPDATED | UNCHANGED | OFFLINE | NOT_FOUND | INVALID.
+/// (스테이션 전용 필드라 Inspection.Contracts가 아니라 HMI 안에 둔다)
+/// </summary>
+public record RecipeSyncItem(string ProductId, string Status, int? Version, Guid? RecipeId,
+    string? ApprovedBy, DateTimeOffset? ApprovedAt);
 
 /// <summary>
 /// 스테이션 서버에 검사를 요청한다.

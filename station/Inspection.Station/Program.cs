@@ -14,8 +14,9 @@ builder.Services.AddHttpClient<IInferenceClient, InferenceClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(20);
 });
 
-// 레시피(정답지) 공급: 실행 폴더의 Recipes/*.json. MES 레시피 동기화도 같은 폴더를 쓴다.
+// 레시피(정답지) 공급: recipes-cache/{제품}.json(MES에서 받은 승인 레시피)이 있으면 그것, 없으면 원본 Recipes/{제품}.json.
 builder.Services.AddSingleton(sp => RecipeFolder.FromConfig(sp.GetRequiredService<IConfiguration>()));
+builder.Services.AddSingleton(sp => RecipeCache.FromConfig(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<IRecipeProvider, FileRecipeProvider>();
 
 // 검사 흐름 지휘 (사진 → 추론 → 판정)
@@ -48,12 +49,11 @@ builder.Services.AddHttpClient("MesRecipes", (sp, client) =>
     client.BaseAddress = new Uri(o.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
 });
-builder.Services.AddSingleton<RecipeMetaStore>();
 builder.Services.AddSingleton(sp => new RecipeSyncService(
     () => sp.GetRequiredService<IHttpClientFactory>().CreateClient("MesRecipes"),
     sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MesOptions>>(),
     sp.GetRequiredService<RecipeFolder>(),
-    sp.GetRequiredService<RecipeMetaStore>(),
+    sp.GetRequiredService<RecipeCache>(),
     sp.GetRequiredService<IRecipeProvider>(),
     sp.GetRequiredService<ILogger<RecipeSyncService>>()));
 

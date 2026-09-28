@@ -66,21 +66,45 @@ public class HttpStationClient : IStationClient
 
             if (response.IsSuccessStatusCode)
             {
-                var worker = await response.Content.ReadFromJsonAsync<LoginResult>(JsonOptions, ct);
-                return worker is null
+                var body = await response.Content.ReadFromJsonAsync<LoginResponse>(JsonOptions, ct);
+                return body is null
                     ? new LoginOutcome(LoginStatus.Unavailable, null, "로그인 응답을 읽을 수 없습니다.")
-                    : new LoginOutcome(LoginStatus.Ok, worker);
+                    : new LoginOutcome(LoginStatus.Ok,
+                        new LoginResult(body.EmployeeId, body.Name, body.Role, body.Offline),
+                        RecipeSync: body.RecipeSync ?? []);
             }
 
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
                 return new LoginOutcome(LoginStatus.InvalidCredentials, null, "사번 또는 PIN이 올바르지 않습니다.");
 
-            return new LoginOutcome(LoginStatus.Unavailable, null, "MES에 연결할 수 없습니다.");
+            // 503: 스테이션은 살아 있고 MES만 안 됨 → 지금 쓰는 레시피 목록(OFFLINE)을 같이 준다
+            return new LoginOutcome(LoginStatus.Unavailable, null, "MES에 연결할 수 없습니다.",
+                await ReadRecipeSyncAsync(response, ct));
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             // 스테이션 자체에 닿지 못함
             return new LoginOutcome(LoginStatus.Unavailable, null, "스테이션에 연결할 수 없습니다.");
+        }
+    }
+
+    // /api/login 200 응답 (스테이션 LoginResponse). recipeSync가 없는 옛 스테이션이면 null
+    private record LoginResponse(string EmployeeId, string Name, string Role, bool Offline,
+        List<RecipeSyncItem>? RecipeSync);
+
+    private record UnavailableResponse(List<RecipeSyncItem>? RecipeSync);
+
+    private static async Task<IReadOnlyList<RecipeSyncItem>> ReadRecipeSyncAsync(HttpResponseMessage response,
+        CancellationToken ct)
+    {
+        try
+        {
+            var body = await response.Content.ReadFromJsonAsync<UnavailableResponse>(JsonOptions, ct);
+            return body?.RecipeSync ?? [];
+        }
+        catch (Exception ex) when (ex is JsonException or NotSupportedException)
+        {
+            return [];   // 본문이 없거나 JSON이 아님 → 배너 없이 로그인만
         }
     }
     

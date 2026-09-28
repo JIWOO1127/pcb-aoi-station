@@ -300,6 +300,51 @@
         </Border>
 
         <!--
+          로그인 직후 레시피 배너: 헤더 바로 아래에 5초 떠 있다가 사라진다.
+          본문 위에 겹쳐 그려 레이아웃을 밀지 않고(위치 고정 원칙), 클릭을 받지 않아 검사를 막지 않는다.
+          파란색 = MES에서 새 승인 레시피 적용, 노란색 = MES 연결 안 됨(마지막으로 받은 레시피로 검사).
+        -->
+        <Border Grid.Row="1" VerticalAlignment="Top" Margin="12,6,12,0" Padding="16,10" CornerRadius="6"
+                IsHitTestVisible="False"
+                Visibility="{Binding ShowRecipeBanner, Converter={StaticResource BoolToVisibility}}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="#1565C0"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding RecipeBannerKind}" Value="Offline">
+                            <Setter Property="Background" Value="#F9A825"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <TextBlock Text="{Binding RecipeBannerTitle}" FontSize="18" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="White"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RecipeBannerKind}" Value="Offline">
+                                    <Setter Property="Foreground" Value="#212121"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding RecipeBannerDetail}" FontSize="13" Foreground="#E3F2FD" Margin="0,3,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RecipeBannerDetail}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!--
           로그인 화면: 본문과 조작바를 덮는다. 로그인하면 사라진다 (Hmi:RequireLogin=false면 처음부터 안 보임).
           PIN은 보안상 바인딩하지 않고 PasswordBox를 그대로 명령에 넘긴다.
         -->

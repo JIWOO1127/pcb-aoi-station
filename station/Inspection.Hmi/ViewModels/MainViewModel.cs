@@ -23,6 +23,14 @@ public enum PanelMode
     Board       // 보드 미니어처 + 동작 표시 — PASS, FAIL일 때
 }
 
+/// <summary>로그인 직후 헤더 아래 레시피 배너 종류.</summary>
+public enum RecipeBannerKind
+{
+    None,
+    Updated,   // 파란색: MES에서 새 승인 레시피를 받음
+    Offline    // 노란색: MES에 닿지 못해 마지막으로 받은 레시피로 검사
+}
+
 /// <summary>
 /// 작업자 화면의 상태와 동작.
 ///
@@ -51,6 +59,7 @@ public partial class MainViewModel : ObservableObject
     private readonly DispatcherTimer _passTimer;
     private readonly DispatcherTimer _mesTimer;   // 5초마다 스테이션에 MES 전송 상태를 묻는다
     private bool _mesRefreshing;                  // 이전 조회가 끝나기 전에 다시 부르지 않게
+    private readonly DispatcherTimer _recipeBannerTimer;   // 로그인 직후 레시피 배너를 5초 뒤 내린다
 
     private readonly int _maxCameraIndex;
     private readonly double _guideAspect;   // 검사 영역의 가로/세로 (화면에 보이는 방향 기준)
@@ -101,6 +110,13 @@ public partial class MainViewModel : ObservableObject
         _mesTimer.Tick += async (_, _) => await RefreshMesStatusAsync();
         _mesTimer.Start();
         _ = RefreshMesStatusAsync();   // 5초 기다리지 않고 바로 한 번
+
+        _recipeBannerTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(5) };
+        _recipeBannerTimer.Tick += (_, _) =>
+        {
+            _recipeBannerTimer.Stop();
+            RecipeBannerKind = RecipeBannerKind.None;
+        };
 
         _input.Camera.FrameArrived += OnFrameArrived;
         _input.Camera.ConnectionChanged += OnCameraConnectionChanged;
@@ -162,6 +178,47 @@ public partial class MainViewModel : ObservableObject
     public string WorkerText => CurrentWorker is { } w
         ? $"작업자 {w.Name} ({w.EmployeeId}){(w.Offline ? " · 오프라인" : "")}"
         : "";
+
+    // ── 로그인 직후 레시피 배너 (헤더 아래 5초, 검사를 막지 않는다) ──
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRecipeBanner))]
+    private RecipeBannerKind recipeBannerKind = RecipeBannerKind.None;
+    [ObservableProperty] private string recipeBannerTitle = "";
+    [ObservableProperty] private string recipeBannerDetail = "";
+
+    public bool ShowRecipeBanner => RecipeBannerKind != RecipeBannerKind.None;
+
+    /// <summary>
+    /// 로그인 응답의 recipeSync 중 지금 선택된 제품 한 줄로 배너를 정한다.
+    ///   UPDATED → 파란 배너 "레시피 업데이트", OFFLINE → 노란 배너 "MES 연결 안 됨", 그 밖(UNCHANGED 등)은 없음
+    /// </summary>
+    private void ShowRecipeSync(IReadOnlyList<RecipeSyncItem>? items)
+    {
+        _recipeBannerTimer.Stop();
+        RecipeBannerKind = RecipeBannerKind.None;
+
+        var item = items?.FirstOrDefault(i => i.ProductId == SelectedProduct);
+        if (item is null) return;
+
+        string version = item.Version is { } v ? $"v{v}" : "";
+        switch (item.Status)
+        {
+            case "UPDATED":
+                RecipeBannerTitle = $"레시피 업데이트 · {item.ProductId} {version} 적용됨";
+                string approvedAt = item.ApprovedAt is { } at ? at.ToLocalTime().ToString("yyyy-MM-dd HH:mm") : "-";
+                RecipeBannerDetail = $"승인 {item.ApprovedBy ?? "-"} · {approvedAt} · 이번 검사부터 {version} 기준으로 판정합니다";
+                RecipeBannerKind = RecipeBannerKind.Updated;
+                break;
+            case "OFFLINE":
+                RecipeBannerTitle = $"MES 연결 안 됨 · 마지막으로 받은 {item.ProductId} {version}로 검사합니다";
+                RecipeBannerDetail = "";
+                RecipeBannerKind = RecipeBannerKind.Offline;
+                break;
+            default:
+                return;
+        }
+        _recipeBannerTimer.Start();
+    }
 
     partial void OnCurrentWorkerChanged(LoginResult? value)
     {
@@ -723,6 +780,7 @@ public partial class MainViewModel : ObservableObject
                 case LoginStatus.Ok when outcome.Worker is not null:
                     if (!outcome.Worker.Offline) _session.Remember(id, pin, outcome.Worker);
                     SignIn(outcome.Worker);
+                    ShowRecipeSync(outcome.RecipeSync);
                     break;
 
                 case LoginStatus.InvalidCredentials:
@@ -732,7 +790,11 @@ public partial class MainViewModel : ObservableObject
                 default:
                     // MES(또는 스테이션)가 안 될 때: 전에 로그인한 적 있는 작업자면 저장된 정보로
                     var offline = _session.TryOffline(id, pin);
-                    if (offline is not null) SignIn(offline);
+                    if (offline is not null)
+                    {
+                        SignIn(offline);
+                        ShowRecipeSync(outcome.RecipeSync);   // 스테이션이 준 OFFLINE 목록 (스테이션에도 못 닿았으면 없음)
+                    }
                     else LoginMessage = $"{outcome.Message} 이 PC에서 로그인한 적이 없는 작업자는 오프라인 로그인을 할 수 없습니다.";
                     break;
             }
