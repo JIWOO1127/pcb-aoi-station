@@ -151,6 +151,6 @@ def build_draft(groups: list[BoxGroup]) -> Draft:
 
 
 def overlay_holes(holes: list[Hole]) -> list[dict]:
-    """정렬된 사진 위 홀 282개의 위치 {label, x, y} (px, 소수 1자리)."""
-    return [{"label": h.label, "x": round(float(h.pixel[0]), 1), "y": round(float(h.pixel[1]), 1)}
+    """정렬된 사진 위 홀 282개의 위치 {label, x, y} (정수 px, box와 같은 방식)."""
+    return [{"label": h.label, "x": int(round(float(h.pixel[0]))), "y": int(round(float(h.pixel[1])))}
             for h in sorted(holes, key=hole_sort_key)]
