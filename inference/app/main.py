@@ -8,13 +8,14 @@
 이 서비스는 절대 판정하지 않는다. (docs/api-contract.md 참고)
 """
 
+import base64
 import os
 from pathlib import Path
 from typing import List
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, UploadFile
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 from ultralytics import YOLO
 
@@ -40,8 +41,40 @@ class PartResult(BaseModel):
     confidence: float  # 0~1
 
 
+class OverlayPinhole(BaseModel):
+    pinhole: str  # 핀홀 라벨 (예: "J9")
+    x: float  # 크롭된 이미지 기준 픽셀 x좌표
+    y: float  # 크롭된 이미지 기준 픽셀 y좌표
+
+
+class OverlayBox(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
+    part_class: str = Field(alias="class")  # YOLO가 탐지한 부품 종류
+    confidence: float  # 0~1
+    x1: float  # 크롭된 이미지 기준 픽셀 좌표
+    y1: float
+    x2: float
+    y2: float
+
+
+class InferOverlay(BaseModel):
+    """/infer?overlay=true 일 때만 붙는 시각 확인용 정보. 좌표는 모두 imageJpeg 기준."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    width: int  # 크롭된 이미지(roi_image) 가로 픽셀
+    height: int  # 크롭된 이미지 세로 픽셀
+    image_jpeg: str = Field(alias="imageJpeg")  # 크롭된 이미지, JPEG(품질 90) base64
+    pinholes: List[OverlayPinhole]  # 핀홀 282개 전부의 기대 픽셀 위치
+    boxes: List[OverlayBox]  # YOLO 탐지 박스 전부
+
+
 class InferResponse(BaseModel):
     parts: List[PartResult]
+    # overlay=true일 때만 채운다. 비어 있으면 응답 JSON에 아예 나오지 않는다
+    # (/infer의 response_model_exclude_unset) → overlay=false 응답은 예전과 같다.
+    overlay: InferOverlay | None = None
 
 
 class DebugPinhole(BaseModel):
@@ -59,16 +92,51 @@ def health() -> dict:
     return {"status": "ok"}
 
 
-@app.post("/infer", response_model=InferResponse)
-async def infer(image: UploadFile = File(...)) -> InferResponse:
+@app.post("/infer", response_model=InferResponse, response_model_exclude_unset=True)
+async def infer(
+    image: UploadFile = File(...),
+    overlay: bool = Query(False, description="true면 크롭 이미지·핀홀 좌표·YOLO 박스를 함께 반환"),
+) -> InferResponse:
     if image.content_type != "image/jpeg":
         raise HTTPException(
             status_code=415, detail="image는 JPEG(image/jpeg)만 지원합니다."
         )
 
     image_bytes = await image.read()
-    parts = run_inference(image_bytes)
-    return InferResponse(parts=parts)
+    if not overlay:
+        parts = run_inference(image_bytes)
+        return InferResponse(parts=parts)
+
+    # overlay: run_inference와 같은 단계를 한 번만 돌리고, 중간 결과(크롭 이미지·
+    # 핀홀·박스)를 응답에 함께 싣는다.
+    decoded = _decode_image(image_bytes)
+    roi_image, img_scale, label_anchors = crop_to_roi(decoded)
+    _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
+    boxes = detect_parts(roi_image)
+    match_holes_to_boxes(holes, boxes)
+
+    parts = [
+        PartResult(pinhole=hole.label, part_class=hole.part_class, confidence=hole.confidence)
+        for hole in holes
+        if hole.covered
+    ]
+    ok, jpeg = cv2.imencode(".jpg", roi_image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+    if not ok:
+        raise HTTPException(status_code=500, detail="크롭 이미지를 JPEG로 인코딩할 수 없습니다.")
+
+    return InferResponse(
+        parts=parts,
+        overlay=InferOverlay(
+            width=roi_image.shape[1],
+            height=roi_image.shape[0],
+            image_jpeg=base64.b64encode(jpeg.tobytes()).decode("ascii"),
+            pinholes=[OverlayPinhole(pinhole=h.label, x=h.pixel[0], y=h.pixel[1]) for h in holes],
+            boxes=[
+                OverlayBox(part_class=b.part_class, confidence=b.confidence, x1=b.x1, y1=b.y1, x2=b.x2, y2=b.y2)
+                for b in boxes
+            ],
+        ),
+    )
 
 
 @app.post("/infer/debug", response_model=InferDebugResponse)
@@ -161,4 +229,41 @@ def detect_parts(roi_image: np.ndarray) -> List[DetectedBox]:
                 confidence=float(box.conf[0]),
             )
         )
-    return boxes
+    return _deduplicate_boxes(boxes)
+
+
+_DUPLICATE_IOU_THRESHOLD = 0.5
+
+
+def _iou(a: DetectedBox, b: DetectedBox) -> float:
+    """두 박스의 IoU(겹침 비율, 0~1)를 계산한다."""
+    ix1, iy1 = max(a.x1, b.x1), max(a.y1, b.y1)
+    ix2, iy2 = min(a.x2, b.x2), min(a.y2, b.y2)
+    inter = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+    if inter == 0.0:
+        return 0.0
+    area_a = (a.x2 - a.x1) * (a.y2 - a.y1)
+    area_b = (b.x2 - b.x1) * (b.y2 - b.y1)
+    return inter / (area_a + area_b - inter)
+
+
+def _deduplicate_boxes(boxes: List[DetectedBox]) -> List[DetectedBox]:
+    """같은 부품 하나를 YOLO가 박스 여러 개로 중복 탐지하는 경우, 신뢰도가
+    가장 높은 박스만 남긴다. 겹침 비율(`_DUPLICATE_IOU_THRESHOLD` 이상)만 보고
+    판단한다 — 클래스는 같은지 확인 안 한다. 실제 부품은 한 자리에 하나만
+    있을 수 있으니, 박스 위치가 거의 같으면 클래스가 다르게 잡혔어도(YOLO가
+    같은 물체를 헷갈린 것) 같은 물체의 중복 탐지로 본다.
+
+    YOLO 자체 NMS(기본 IoU 0.7)가 이미 걸러내지만, 부품이 크고 각도가
+    미묘하게 다른 두 박스로 잡히면 IoU가 0.7보다 낮게 나와 통과할 수 있다
+    (실측: IC칩 하나가 신뢰도 0.96/0.28 박스 2개로 잡힌 사례, IoU≈0.69).
+    클래스까지 다르게 헷갈린 사례도 실측됨: board4의 저항 하나가 신뢰도
+    0.70(resistance470)/0.47(resistance330) 박스 2개로 잡혀서, 클래스가
+    같을 때만 중복으로 보던 예전 버전은 이 경우를 놓쳤다.
+    """
+    kept: List[DetectedBox] = []
+    for box in sorted(boxes, key=lambda b: b.confidence, reverse=True):
+        if any(_iou(box, other) >= _DUPLICATE_IOU_THRESHOLD for other in kept):
+            continue
+        kept.append(box)
+    return kept
