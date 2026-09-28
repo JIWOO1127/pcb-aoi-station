@@ -8,11 +8,13 @@ async function request(path, options = {}) {
   const stored = JSON.parse(sessionStorage.getItem('pcb-aoi-auth') || 'null');
   const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(stored?.accessToken ? { Authorization: `Bearer ${stored.accessToken}` } : {}), ...options.headers } });
   if (response.status === 401) unauthorizedHandler();
+  const body = await response.text();
+  const contentType = response.headers.get('content-type') || '';
+  const payload = body && contentType.includes('application/json') ? JSON.parse(body) : body || null;
   if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
-    throw new Error(error.message || '서버 요청에 실패했습니다.');
+    throw new Error(payload?.message || '서버 요청에 실패했습니다.');
   }
-  return response.json();
+  return payload;
 }
 
 const delay = (value, ms = 180) => new Promise((resolve) => setTimeout(() => resolve(structuredClone(value)), ms));
@@ -26,7 +28,7 @@ export const stationService = { list: () => delay(data.stations), get: (id) => d
 export const modelService = { list: () => delay(data.models), get: (id) => delay(data.models.find((item) => item.id === id)) };
 export const userService = {
   list: () => request('/admin/users'),
-  create: (user) => request('/admin/users', { method: 'POST', body: JSON.stringify(user) }),
+  create: ({ employeeId, name, password, role, active }) => request('/admin/users', { method: 'POST', body: JSON.stringify({ employeeId, name, password, role, active }) }),
   update: (employeeId, user) => request(`/admin/users/${employeeId}`, { method: 'PUT', body: JSON.stringify(user) }),
   resetPassword: (employeeId, password) => request(`/admin/users/${employeeId}/reset-password`, { method: 'POST', body: JSON.stringify({ password }) }),
 };

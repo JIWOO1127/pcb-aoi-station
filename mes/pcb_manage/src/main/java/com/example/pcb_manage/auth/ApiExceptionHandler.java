@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -17,8 +18,16 @@ public class ApiExceptionHandler {
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ResponseEntity<Map<String, Object>> invalidRequest() {
-        return error(HttpStatus.BAD_REQUEST, "사번과 PIN을 모두 입력해 주세요.");
+    public ResponseEntity<Map<String, Object>> invalidRequest(MethodArgumentNotValidException exception) {
+        String message = exception.getBindingResult().getFieldErrors().stream()
+                .findFirst().map(fieldError -> fieldError.getDefaultMessage())
+                .orElse("요청 값을 확인해 주세요.");
+        return error(HttpStatus.BAD_REQUEST, message);
+    }
+
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<Map<String, Object>> responseStatus(ResponseStatusException exception) {
+        return error(HttpStatus.valueOf(exception.getStatusCode().value()), exception.getReason());
     }
 
     private ResponseEntity<Map<String, Object>> error(HttpStatus status, String message) {

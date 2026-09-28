@@ -24,4 +24,9 @@ public class WorkerRepository {
                         rs.getString("pin_hash"), rs.getString("role"), rs.getBoolean("active")))
                 .optional();
     }
+
+    public void recordSuccessfulLogin(String workerId) {
+        jdbcClient.sql("UPDATE worker SET last_login_at=CURRENT_TIMESTAMP WHERE worker_id=:workerId")
+                .param("workerId", workerId).update();
+    }
 }
