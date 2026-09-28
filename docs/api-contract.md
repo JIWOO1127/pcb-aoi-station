@@ -90,7 +90,7 @@
 
 ## 스테이션 → MES: 검사 기록 API (MVP-25) — 초안, 2026-09-27
 
-작성 서지우(스테이션) · 검토 이하연(MES). 기준: `mes/MVP-45-users-audit`의 V1 스키마와 인증 API.
+작성 서지우(스테이션) · 검토 이하연(MES). 기준: main의 MES 스키마(마이그레이션 V1~V3)와 인증 API.
 스테이션 쪽 구현: `station/Inspection.Station/Services/Mes/` (보관 후 재전송).
 
 ### 요약
@@ -99,7 +99,7 @@
 - 스테이션은 검사가 끝날 때마다 `POST /api/inspections`로 기록 한 건을 보낸다.
 - MES가 꺼져 있으면 스테이션이 PC에 쌓아뒀다가 연결되면 **오래된 것부터 다시** 보낸다.
 - 그래서 **같은 `inspectionId`가 두 번 이상 올 수 있다.** MES는 두 번째부터 저장하지 않고 `409`를 돌려주면 된다. 스테이션은 `201`과 `409`를 모두 성공으로 본다.
-- 원본 이미지는 MES로 전송하지 않는다. 스테이션도 현재 저장하지 않으며, 이미지 보관은 후속 작업이다.
+- MES는 이미지와 이미지 경로를 저장하지 않는다.
 
 ### 1. 요청
 
@@ -172,8 +172,8 @@ X-Station-Key: <스테이션 키>
 | parts[].expectedClass | string | O | 있어야 할 종류. 추가 부품은 `-` |
 | parts[].detectedClass | string | - | 실제로 본 종류. 비었으면 null |
 | parts[].defectType | string | - | null(정상) \| `MISSING` \| `WRONG_PART` \| `WIRE_COLOR_SWAP` \| `OFFSET` \| `EXTRA` |
-| parts[].expectedHoles | string[] | O | 레시피 홀 (`Q10` 형식). MES에는 JSONB 배열로 저장 |
-| parts[].coveredHoles | string[] | O | 실제로 덮인 홀. MES에는 JSONB 배열로 저장 |
+| parts[].expectedHoles | string[] | O | 레시피 홀. 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 |
+| parts[].coveredHoles | string[] | O | 실제로 덮인 홀. 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 |
 
 `INVALID`이면 `parts`는 빈 배열이다.
 
@@ -187,9 +187,9 @@ X-Station-Key: <스테이션 키>
 | 본문 오류 (필수값 누락, 없는 productId 등) | 400 / 422 | `{"message":"..."}` | 따로 빼 둠 (사람이 확인) |
 | MES 내부 오류 | 5xx | - | 잠시 뒤 재시도 |
 
-### 3. 현재 스키마(V1)와 맞추려면 필요한 변경 (후속 마이그레이션 제안)
+### 3. 현재 스키마(V1~V3)와 맞추려면 필요한 변경 (제안: V4 이후 마이그레이션)
 
-마이그레이션 번호는 MES 담당이 정한다 (현재 V3 사용 중).
+main의 마지막 마이그레이션은 V3이므로 V4 이후 번호로 한다 (정확한 번호는 MES 담당이 정함).
 
 | 문제 | 제안 |
 |---|---|
@@ -197,15 +197,15 @@ X-Station-Key: <스테이션 키>
 | `errorCode`를 받을 곳 없음 | `inspection.error_code VARCHAR(50) NULL` 추가 |
 | `stationId`를 받을 곳 없음 | `inspection.station_id VARCHAR(50) NULL` 추가 |
 | `inspection.worker_id` NOT NULL, HMI 로그인 없이 검사하면 사번 없음 | **NULL 허용으로 변경** (결정) |
-| `part_result`에 홀 정보 없음 (판정이 mm 좌표 → 핀홀 방식으로 바뀜) | `expected_class VARCHAR(100)`, `expected_holes JSONB`, `covered_holes JSONB` 추가 (MES 담당 제안, 예: `["Q9","Q10"]`) |
-| `recipe_part`가 mm 좌표 기준 (`x_mm`, `y_mm`, `tolerance_mm`) | `holes JSONB` 추가 (레시피 홀 목록, 예: `["Q9","Q10"]`). mm 컬럼은 정리 |
+| `part_result`에 홀 정보 없음 (판정이 mm 좌표 → 핀홀 방식으로 바뀜) | `expected_class VARCHAR(100)`, `expected_holes`·`covered_holes` 추가 — 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 (MES 담당 제안) |
+| `recipe_part`가 mm 좌표 기준 (`x_mm`, `y_mm`, `tolerance_mm`) | `holes` 추가 (레시피 홀 목록) — 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장. mm 컬럼은 정리 |
 | `part_result.offset_mm`, `confidence` | 사용 안 함, NULL로 둠 |
 | `part_result_id` | MES가 생성 (`gen_random_uuid()` 또는 JPA에서 UUID) |
 | `product`에 `NE555-A` 필요 (FK) | 시드 데이터로 추가 |
 | 시드 작업자 없음 | 시연용 작업자 1~2명 시드 (PIN은 BCrypt 해시) |
 
 ```sql
--- 후속 마이그레이션 예시 (번호는 MES 담당이 정함 — V3은 이미 사용 중, MES 담당자가 맞게 수정)
+-- V4 이후 마이그레이션 예시 (main의 마지막 번호는 V3 — 번호·내용은 MES 담당자가 맞게 수정)
 ALTER TABLE inspection DROP CONSTRAINT IF EXISTS inspection_verdict_check;
 ALTER TABLE inspection ADD CONSTRAINT inspection_verdict_check CHECK (verdict IN ('PASS','FAIL','INVALID'));
 ALTER TABLE inspection ADD COLUMN error_code VARCHAR(50);
@@ -256,7 +256,7 @@ X-Station-Key: <스테이션 키>
 ### 6. 합의할 것 (월요일 아침)
 
 - [x] `workerId` null 처리 → **NULL 허용** (로그인 없이 검사한 경우)
-- [x] 홀 목록 저장 형식 → **JSONB** (MES 담당 제안)
+- [x] 홀 목록 저장 형식 → 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장 (MES 담당 제안)
 - [ ] 스테이션 키 값과 설정 이름
 - [ ] 시연 작업자 사번·PIN
 - [ ] MES를 띄울 노트북(LG)과 주소
@@ -266,3 +266,4 @@ X-Station-Key: <스테이션 키>
 - **레시피 홀 기준 전환**: 박스가 덮은 홀 → 부품 다리가 꽂힌 홀 (inference MVP-32, 레시피 NE555-A v4 / NE555-B v2).
   전환 후 `expectedHoles`·`coveredHoles`는 다리 홀만 담는다 (예: 전선·저항 2개, IC 14개). 위 본문 예시는 전환 전 형식이다.
 - **웹 조회 응답 계약**: `GET /api/inspections`, `GET /api/inspections/{id}`의 응답 JSON 모양 (목록 필드, 페이지 처리, 부품별 결과 포함 범위).
+- **실제 MES 검사 기록 저장, 웹 연동**: MES에 `POST /api/inspections`·확인 기록 API와 스테이션 키 인증 구현, 위 제안 마이그레이션 적용, 관리자 웹의 검사 기록 화면 연동.
