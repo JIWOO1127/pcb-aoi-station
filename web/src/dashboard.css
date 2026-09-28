@@ -1,0 +1,14 @@
+.chart-empty {
+  height: 230px;
+  display: grid;
+  place-items: center;
+}
+
+.chart-empty .empty-state {
+  padding: 0;
+}
+
+.status-invalid {
+  color: #a66505;
+  background: #fff3d7;
+}
