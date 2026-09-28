@@ -10,6 +10,7 @@ namespace Inspection.Contracts;
 ///   덮인 홀의 종류가 기대와 다름              → 오부품 (전선끼리 색만 다르면 전선 색)
 ///   종류는 맞는데 레시피 홀 일부만 덮임        → 위치
 ///   레시피 홀이 전부 기대 종류로 덮임          → 정상
+/// 위치 불량 부품의 빈 홀 바로 옆(1칸)에 같은 종류가 있으면 → 그 부품의 빗나간 다리로 흡수 (추가로 따로 세지 않음)
 /// 마지막에 레시피에 없는 홀이 덮여 있으면      → 추가
 ///
 /// 순수 함수라 카메라·모델·DB 없이 단위 테스트로 개발한다.
@@ -50,10 +51,13 @@ public static class InspectionRules
                 defect, defect is null ? Verdict.Pass : Verdict.Fail));
         }
 
-        // 레시피 어느 부품에도 속하지 않은 홀이 덮여 있으면 추가 부품
-        var extras = detections
-            .Where(d => !usedHoles.Contains(d.Hole))
-            .GroupBy(d => d.Cls);   // 같은 종류끼리 한 줄로 묶어서 보기 좋게
+        // 레시피 어느 부품에도 속하지 않은 홀 (추가 부품 후보)
+        var stray = detections.Where(d => !usedHoles.Contains(d.Hole)).ToList();
+
+        AbsorbShiftedLegs(results, stray);
+
+        // 흡수되고 남은 홀이 덮여 있으면 추가 부품
+        var extras = stray.GroupBy(d => d.Cls);   // 같은 종류끼리 한 줄로 묶어서 보기 좋게
 
         foreach (var group in extras)
         {
@@ -65,6 +69,43 @@ public static class InspectionRules
 
         return results;
     }
+
+    /// <summary>
+    /// 다리 한 칸 이동 흡수.
+    /// 다리 기준 레시피에서는 다리 하나가 옆 홀로 빗나가면 "위치(빈 레시피 홀)"와 "추가(엉뚱한 홀)"가 따로 나와
+    /// 같은 부품 하나가 불량 두 건이 된다. 위치 불량 부품의 빈 레시피 홀 바로 옆(1칸, 대각선 포함)에
+    /// 같은 종류의 추가 홀이 있으면 그 홀을 그 부품의 덮인 홀로 옮긴다 → 위치 불량 한 건만 남는다.
+    /// 빈 홀 하나당 하나만 흡수하고, 레시피 앞쪽(먼저 판정된) 부품이 먼저 가져간다.
+    /// 판정(위치)은 그대로 둔다 — 빈 레시피 홀은 여전히 비어 있다.
+    /// </summary>
+    private static void AbsorbShiftedLegs(List<PartResult> results, List<HoleDetection> stray)
+    {
+        for (int i = 0; i < results.Count; i++)
+        {
+            var part = results[i];
+            if (part.Defect != DefectType.Offset) continue;
+
+            var covered = new List<Hole>(part.CoveredHoles);
+            foreach (var empty in part.ExpectedHoles.Where(h => !part.CoveredHoles.Contains(h)))
+            {
+                var near = stray
+                    .Where(d => d.Cls == part.ExpectedClass && Distance(d.Hole, empty) <= 1)
+                    .OrderBy(d => Distance(d.Hole, empty))
+                    .FirstOrDefault();
+                if (near is null) continue;
+
+                stray.Remove(near);
+                covered.Add(near.Hole);
+            }
+
+            if (covered.Count != part.CoveredHoles.Count)
+                results[i] = part with { CoveredHoles = covered };
+        }
+    }
+
+    /// <summary>두 홀 사이 칸 수 (가로·세로·대각선 모두 한 칸 = 1).</summary>
+    private static int Distance(Hole a, Hole b) =>
+        Math.Max(Math.Abs(a.Row - b.Row), Math.Abs(a.Col - b.Col));
 
     private static (DefectType?, string?) Classify(
         RecipePart part, List<Hole> covered, List<string> classes)
