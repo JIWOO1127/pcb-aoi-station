@@ -83,6 +83,10 @@ public partial class MainViewModel : ObservableObject
         ShowFrameGuide = config.GetValue("Camera:ShowGuide", true);
         _maxAttempts = config.GetValue("Hmi:MaxAttempts", 3);
 
+        // 헤더 드롭다운에 보일 제품 (Hmi:Products). 첫 번째가 기본 선택. 없으면 NE555-A 하나.
+        var products = config.GetSection("Hmi:Products").Get<string[]>();
+        Products = products is { Length: > 0 } ? products : ["NE555-A"];
+
         _passTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromSeconds(config.GetValue("Hmi:PassHoldSeconds", 2.5))
@@ -104,6 +108,7 @@ public partial class MainViewModel : ObservableObject
         BuildEmptyBoard();
         RefreshInputInfo();
         GoIdle();
+        SelectedProduct = Products[0];   // 기본 선택 (NE555-A가 아니면 위 초기화가 한 번 더 돈다 — 무해)
 
         if (_input.Mode == InputMode.Camera) _input.Camera.Start();
         else LoadFilePreview();
@@ -112,7 +117,27 @@ public partial class MainViewModel : ObservableObject
     // ── 상태 ────────────────────────────────────────────────
     [ObservableProperty] private ScreenState state = ScreenState.Idle;
 
+    /// <summary>선택할 수 있는 제품 (레시피 이름과 같다: Station Recipes/{제품}.json).</summary>
+    public IReadOnlyList<string> Products { get; }
+
     [ObservableProperty] private string selectedProduct = "NE555-A";
+
+    /// <summary>검사 중에는 제품을 바꿀 수 없다.</summary>
+    public bool CanChangeProduct => State != ScreenState.Busy;
+
+    /// <summary>
+    /// 제품을 바꾸면 다른 보드이므로 재검사 흐름을 끊는다:
+    /// 보드 번호를 처음부터, 직전 불량·직전 결과 요약을 지우고 대기 화면으로.
+    /// </summary>
+    partial void OnSelectedProductChanged(string value)
+    {
+        _boardNo = 0;
+        _attempt = 0;
+        _prevDefects = null;
+        _lastSummary = "";
+        LastResultNote = "";
+        GoIdle();
+    }
     [ObservableProperty] private string bannerText = "보드를 올리세요";
     [ObservableProperty] private string bannerNote = "";       // 배너 오른쪽 아래 작은 글씨 (재검사 비교)
     [ObservableProperty] private string statusMessage = "";
@@ -252,6 +277,7 @@ public partial class MainViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(PrimaryButtonText));
         OnPropertyChanged(nameof(ShowRejectButton));
+        OnPropertyChanged(nameof(CanChangeProduct));
         InspectCommand.NotifyCanExecuteChanged();
         RejectCommand.NotifyCanExecuteChanged();
         NextCameraCommand.NotifyCanExecuteChanged();

@@ -30,8 +30,16 @@
         <!-- 헤더 -->
         <Border Grid.Row="0" Background="#2D2D2D" Padding="12,0">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Left" Text="{Binding SelectedProduct, StringFormat=제품: {0}}"
-                           FontSize="17" FontWeight="Bold" VerticalAlignment="Center"/>
+                <!--
+                  제품 선택 (Hmi:Products). 검사 중에는 잠근다.
+                  Focusable=False: 선택 후 포커스가 남아 Space(검사)·방향키가 드롭다운으로 가지 않게.
+                -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="제품:" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}"
+                              IsEnabled="{Binding CanChangeProduct}" Focusable="False"
+                              MinWidth="120" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                </StackPanel>
                 <TextBlock DockPanel.Dock="Left" Text="{Binding InspectionStamp}"
                            Margin="22,0,0,0" FontSize="17" Foreground="#E0E0E0" VerticalAlignment="Center"/>
                 <TextBlock DockPanel.Dock="Left" Text="{Binding LastResultNote}"
