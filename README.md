@@ -76,7 +76,7 @@ sequenceDiagram
 - 보드 좌표는 A~U(보드 번호 10~30, 21행) × 0~13(레일2 + A~E + F~J + 레일2, 14열). 전원 레일에는 E·K·Q 행이 없다.
 - 레시피 = 부품마다 "덮어야 할 홀 목록". 정답 보드를 추론에 넣어 나온 결과를 사람이 실제 보드와 대조해 확정한다 (NE555-A v3).
 - 판정: 홀이 전부 비었으면 누락 → 종류가 다르면 다른 부품/전선 색 → 일부만 덮였으면 위치 → 레시피 밖에 부품이 있으면 추가. 신뢰도 0.5 미만 탐지는 제외.
-- mm 좌표 방식(초기 설계)은 쓰지 않는다. 아래 DB 표의 mm 컬럼은 후속 마이그레이션(번호는 MES 담당이 정함, 현재 V3 사용 중)에서 정리 예정.
+- mm 좌표 방식(초기 설계)은 쓰지 않는다. 아래 DB 표의 mm 컬럼은 V4 이후 마이그레이션에서 정리 예정 (현재 마지막 번호는 V3, 번호는 MES 담당이 정함).
 
 ## 3. 저장소 구조
 
@@ -117,60 +117,73 @@ pcb-aoi-station/
 
 ## 5. DB 주요 테이블 (MES 소유)
 
+현재 스키마: `mes/pcb_manage/src/main/resources/db/migration`의 V1~V3 그대로 (main 기준).
+
 ```mermaid
 erDiagram
     PRODUCT ||--o{ RECIPE : "레시피 버전"
     RECIPE ||--o{ RECIPE_PART : "부품 구성"
     PRODUCT ||--o{ INSPECTION : "검사 대상"
+    RECIPE |o--o{ INSPECTION : "적용 레시피"
     WORKER ||--o{ INSPECTION : "검사 수행"
     INSPECTION ||--o{ PART_RESULT : "부품별 결과"
     INSPECTION ||--o{ CONFIRMATION : "작업자 확인"
+    WORKER ||--o{ CONFIRMATION : "확인한 작업자"
 
     PRODUCT {
         string product_id PK
         string name
+        string description
+        boolean active
+        timestamptz created_at
+        timestamptz updated_at
     }
     RECIPE {
         uuid recipe_id PK
         string product_id FK
-        int version
+        int version "UNIQUE (product_id, version)"
         boolean active
+        timestamptz created_at
     }
     RECIPE_PART {
-        uuid recipe_id FK
-        string part_id
+        uuid recipe_id PK, FK
+        string part_id PK
         string expected_class
-        jsonb holes "후속 마이그레이션 (현재 스테이션은 JSON 레시피 사용)"
+        decimal x_mm
+        decimal y_mm
+        decimal tolerance_mm
+        string check_mode
     }
     WORKER {
         string worker_id PK
         string name
         string pin_hash
-        string role
-        string admin_role
+        string role "ADMIN | MANAGER | WORKER"
+        string admin_role "ADMIN | ENGINEER | VIEWER (V2)"
         boolean active
-        timestamp last_login_at
+        timestamptz created_at
+        timestamptz updated_at
+        timestamptz last_login_at "V3"
     }
     INSPECTION {
         uuid inspection_id PK
         string product_id FK
-        string worker_id FK "NULL 허용 (로그인 없이 검사)"
-        string verdict "PASS | FAIL | INVALID"
-        string error_code "후속 마이그레이션"
-        string station_id "후속 마이그레이션"
+        uuid recipe_id FK "NULL 허용"
+        string worker_id FK "NOT NULL"
+        string verdict "PASS | FAIL"
         int defect_count
-        string image_path "현재 비움 (이미지 보관은 후속 작업)"
         int latency_ms
-        timestamp captured_at
+        timestamptz captured_at
+        timestamptz created_at
     }
     PART_RESULT {
-        uuid inspection_id FK
+        uuid part_result_id PK
+        uuid inspection_id FK "UNIQUE (inspection_id, part_id)"
         string part_id
-        string expected_class "후속 마이그레이션"
         string detected_class
+        decimal confidence
+        decimal offset_mm
         string defect_type
-        jsonb expected_holes "후속 마이그레이션"
-        jsonb covered_holes "후속 마이그레이션"
     }
     CONFIRMATION {
         uuid confirmation_id PK
@@ -178,16 +191,34 @@ erDiagram
         string worker_id FK
         string decision
         string reason_code
-        timestamp confirmed_at
+        timestamptz confirmed_at
+    }
+    AUDIT_LOG {
+        uuid audit_id PK
+        string actor_id "worker_id, FK 아님 (V2)"
+        string action
+        string target_type
+        string target_id
+        string details
+        timestamptz occurred_at
     }
 ```
 
 - `inspection_id`는 스테이션이 생성한다. 같은 ID가 재전송되면 MES는 중복 저장하지 않는다 (409). 요청 형식은 `docs/api-contract.md`의 "검사 기록 API".
 - 확인 기록은 덮어쓰지 않고 추가만 한다 (감사 추적).
-- 원본 이미지는 MES로 전송하지 않는다. 스테이션도 현재 저장하지 않으며, 이미지 보관은 후속 작업이다.
-- `inspection.worker_id`는 NULL을 허용한다 (로그인 없이 검사한 경우).
-- 홀 목록(레시피 홀, 탐지 홀)은 JSONB 배열로 저장한다 (예: `["Q9","Q10"]`).
+- MES는 이미지와 이미지 경로를 저장하지 않는다.
+- V1의 `inspection.image_path` 컬럼은 쓰지 않으므로 위 그림에서 뺐다.
 - 레시피는 제품별로 버전을 두고(`RECIPE`), 부품 구성은 버전에 붙는다(`RECIPE_PART`).
+
+**제안(후속)** — V4 이후 마이그레이션. 위 그림(현재 스키마)에는 넣지 않았다. 자세한 내용은 `docs/api-contract.md` 검사 기록 API 3번.
+
+| 테이블 | 제안 |
+|---|---|
+| `inspection` | `verdict`에 `INVALID` 추가, `error_code`·`station_id` 추가, `worker_id` NULL 허용 (로그인 없이 검사한 경우) |
+| `part_result` | `expected_class` 추가, `expected_holes`·`covered_holes` 추가 |
+| `recipe_part` | `holes` 추가, mm 컬럼(`x_mm`·`y_mm`·`tolerance_mm`) 정리 |
+
+- 홀 목록(레시피 홀, 탐지 홀)은 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장한다.
 
 ## 6. 사용자 인증과 관리
 
