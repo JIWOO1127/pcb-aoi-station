@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, Search, RotateCcw, X } from 'lucide-react';
 
 const statusLabels = {
@@ -24,7 +24,7 @@ export function Panel({ title, subtitle, action, children, className = '' }) {
 }
 
 export function SearchFilter({ children, onReset, onSearch }) {
-  return <div className="search-filter"><div className="filter-fields">{children}</div><div className="filter-actions"><button className="btn btn-ghost" onClick={onReset}><RotateCcw size={15} /> 초기화</button><button className="btn btn-primary" onClick={onSearch}><Search size={15} /> 조회</button></div></div>;
+  return <div className="search-filter"><div className="filter-fields">{children}</div><div className="filter-actions"><button className="btn btn-ghost" onClick={onReset}><RotateCcw size={15} /> 초기화</button>{onSearch && <button className="btn btn-primary" onClick={onSearch}><Search size={15} /> 조회</button>}</div></div>;
 }
 
 export function Field({ label, children }) {
@@ -34,6 +34,7 @@ export function Field({ label, children }) {
 export function DataTable({ columns, rows, onRowClick, pageSize = 6, emptyText = '조회된 데이터가 없습니다.' }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+  useEffect(() => { setPage(1); }, [rows, pageSize]);
   const shown = useMemo(() => rows.slice((page - 1) * pageSize, page * pageSize), [rows, page, pageSize]);
   return <div className="table-wrap"><table className="data-table"><thead><tr>{columns.map((col) => <th key={col.key} style={{ width: col.width }}>{col.label}</th>)}</tr></thead><tbody>{shown.length ? shown.map((row, index) => <tr key={row.id || row.employeeId || index} className={onRowClick ? 'clickable' : ''} onClick={() => onRowClick?.(row)}>{columns.map((col) => <td key={col.key}>{col.render ? col.render(row[col.key], row) : row[col.key]}</td>)}</tr>) : <tr><td colSpan={columns.length}><EmptyState text={emptyText} /></td></tr>}</tbody></table>{rows.length > pageSize && <div className="pagination"><span>총 {rows.length}건</span><div><button disabled={page === 1} onClick={() => setPage((p) => p - 1)}><ChevronLeft size={16} /></button><b>{page}</b><span>/ {totalPages}</span><button disabled={page === totalPages} onClick={() => setPage((p) => p + 1)}><ChevronRight size={16} /></button></div></div>}</div>;
 }
