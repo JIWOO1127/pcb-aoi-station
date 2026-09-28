@@ -15,7 +15,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/recipes")
@@ -31,12 +30,7 @@ public class RecipeController {
     public List<RecipeSummary> list() { return repository.list(); }
 
     @GetMapping("/{recipeId}")
-    public RecipeDetail get(@PathVariable UUID recipeId) {
-        RecipeSummary summary = repository.get(recipeId);
-        if (summary == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND, "레시피를 찾을 수 없습니다.");
-        return new RecipeDetail(summary.recipeId(), summary.productId(), summary.version(), summary.note(),
-                summary.active(), summary.createdAt(), repository.parts(recipeId));
-    }
+    public RecipeDetail get(@PathVariable UUID recipeId) { return service.detail(recipeId); }
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
@@ -46,11 +40,21 @@ public class RecipeController {
         return service.create(request, actor.employeeId());
     }
 
+    @PostMapping("/{recipeId}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
+    public RecipeDetail approve(@PathVariable UUID recipeId,
+            @AuthenticationPrincipal AuthenticatedUser actor) {
+        return service.approve(recipeId, actor.employeeId());
+    }
+
     public record RecipeSummary(UUID recipeId, String productId, int version, String note,
-            boolean active, OffsetDateTime createdAt) {}
-    public record RecipePartResponse(String partId, String expectedClass, List<String> holes) {}
+            boolean active, String status, String createdBy, String approvedBy,
+            OffsetDateTime approvedAt, OffsetDateTime createdAt) {}
+    public record RecipePartResponse(String partId, String expectedClass, List<String> holes,
+            Double confidence, boolean needsReview, boolean reviewConfirmed, List<String> reasons) {}
     public record RecipeDetail(UUID recipeId, String productId, int version, String note,
-            boolean active, OffsetDateTime createdAt, List<RecipePartResponse> parts) {}
+            boolean active, String status, String createdBy, String approvedBy,
+            OffsetDateTime approvedAt, OffsetDateTime createdAt, List<RecipePartResponse> parts) {}
     public record CreateRecipeRequest(
             @NotBlank @Size(max = 50) String productId,
             @Positive int version,

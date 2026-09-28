@@ -86,6 +86,25 @@
 - 저장된 새 버전이 활성화되고 해당 제품의 기존 활성 버전은 비활성화된다.
 - 생성 이력은 `RECIPE_CREATE` 감사 로그로 남는다.
 
+### 사진 기반 레시피 초안
+
+React는 Python을 직접 호출하지 않고 MES에만 요청한다. 사진은 분석 응답을 전달한 뒤 폐기하며 DB에 저장하지 않는다.
+
+| Method | Path | 권한 | 설명 |
+|---|---|---|---|
+| `POST` | `/api/recipe-drafts` | ADMIN, ENGINEER | `multipart/form-data`의 `image`, `productId`를 Python `/recipe-draft`로 전달 |
+| `POST` | `/api/recipe-drafts` | ADMIN, ENGINEER | 검토한 부품을 새 버전의 비활성 초안으로 저장 |
+| `POST` | `/api/recipes/{recipeId}/approve` | ADMIN | 초안 승인 및 기존 활성 레시피 비활성화 |
+
+- 분석 파일은 JPEG 또는 PNG만 허용한다.
+- Python 호출 제한 시간은 `service-config.properties`의 `python.timeout-seconds`로 설정하며 기본값은 120초다.
+- 초안의 `recipeId`는 MES가 생성하고 버전은 해당 제품의 최신 버전보다 1 크게 정한다.
+- 초안은 `active=false`, `status=DRAFT`로 저장한다.
+- 승인 시 남은 부품 1개 이상, 지원 클래스, 홀 형식과 클래스별 홀 수, 홀 중복, 검토 필요 부품의 확인 여부를 MES가 다시 검사한다.
+- 승인된 버전은 `active=true`, `status=ACTIVE`가 되고 기존 활성 버전은 `status=ARCHIVED`가 된다.
+- 생성과 승인은 `RECIPE_DRAFT_CREATE`, `RECIPE_APPROVE` 감사 로그로 기록한다.
+- MES·웹·Python 주소와 포트는 루트의 `service-config.properties`에서 관리한다. 환경 변수 `RECIPE_DRAFT_URL`로 Python 주소를 덮어쓸 수 있으며, 로컬 개발에서는 `RECIPE_DRAFT_SAMPLE_FALLBACK=true`일 때 연결 실패를 샘플 응답으로 대체할 수 있다.
+
 ## 스테이션 → 추론 서비스 : `POST /infer`
 
 ### 요청

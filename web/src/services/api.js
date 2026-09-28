@@ -1,10 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || __MES_API_BASE_URL__;
 let unauthorizedHandler = () => {};
 export const setUnauthorizedHandler = (handler) => { unauthorizedHandler = handler; };
 
 async function request(path, options = {}) {
   const stored = JSON.parse(sessionStorage.getItem('pcb-aoi-auth') || 'null');
-  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { 'Content-Type': 'application/json', ...(stored?.accessToken ? { Authorization: `Bearer ${stored.accessToken}` } : {}), ...options.headers } });
+  const isFormData = options.body instanceof FormData;
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers: { ...(!isFormData ? { 'Content-Type': 'application/json' } : {}), ...(stored?.accessToken ? { Authorization: `Bearer ${stored.accessToken}` } : {}), ...options.headers } });
   if (response.status === 401) unauthorizedHandler();
   const body = await response.text();
   const contentType = response.headers.get('content-type') || '';
@@ -28,6 +29,16 @@ export const recipeService = {
   list: () => request('/recipes'),
   get: (id) => request(`/recipes/${id}`),
   create: (recipe) => request('/recipes', { method: 'POST', body: JSON.stringify(recipe) }),
+};
+export const recipeDraftService = {
+  analyze: ({ productId, image }) => {
+    const body = new FormData();
+    body.append('productId', productId);
+    body.append('image', image);
+    return request('/recipe-drafts', { method: 'POST', body });
+  },
+  save: (draft) => request('/recipe-drafts', { method: 'POST', body: JSON.stringify(draft) }),
+  approve: (recipeId) => request(`/recipes/${recipeId}/approve`, { method: 'POST' }),
 };
 export const inspectionService = {
   list: (filters = {}) => request(`/inspections?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString()}`),

@@ -2,6 +2,7 @@ package com.example.pcb_manage.config;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -51,9 +52,11 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${web.host:localhost}") String webHost,
+            @Value("${web.port:5173}") int webPort) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of("http://localhost:5173"));
+        configuration.setAllowedOrigins(java.util.List.of("http://" + webHost + ":" + webPort));
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Station-Key"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
