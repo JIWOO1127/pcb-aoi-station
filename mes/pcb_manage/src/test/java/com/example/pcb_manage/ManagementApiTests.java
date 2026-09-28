@@ -32,7 +32,8 @@ class ManagementApiTests {
         mockMvc.perform(get("/api/products").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(7));
         mockMvc.perform(get("/api/stations").header("Authorization", "Bearer " + token))
-                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(6));
+                .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("ST-01"));
         mockMvc.perform(get("/api/models").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk()).andExpect(jsonPath("$.length()").value(3));
         mockMvc.perform(get("/api/dashboard").header("Authorization", "Bearer " + token))
