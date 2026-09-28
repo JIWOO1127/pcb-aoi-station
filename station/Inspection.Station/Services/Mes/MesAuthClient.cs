@@ -28,7 +28,12 @@ public class MesAuthClient
     private record MesUser(string EmployeeId, string Name, string Role);
     private record MesLoginResponse(string AccessToken, string TokenType, int ExpiresIn, MesUser User);
 
-    public async Task<(Outcome Outcome, LoginResult? User)> LoginAsync(LoginRequest request, CancellationToken ct)
+    /// <returns>
+    /// AccessToken: MES 작업자 JWT. 스테이션 안에서 로그인 직후 레시피 동기화에만 쓰고 저장하지 않는다
+    /// (HMI로도 보내지 않는다). 검사 기록은 여전히 스테이션 키로 보낸다.
+    /// </returns>
+    public async Task<(Outcome Outcome, LoginResult? User, string? AccessToken)> LoginAsync(
+        LoginRequest request, CancellationToken ct)
     {
         try
         {
@@ -36,24 +41,24 @@ public class MesAuthClient
                 new { employeeId = request.EmployeeId, pin = request.Pin }, ct);
 
             if (response.StatusCode is HttpStatusCode.Unauthorized or HttpStatusCode.BadRequest)
-                return (Outcome.InvalidCredentials, null);
+                return (Outcome.InvalidCredentials, null, null);
 
             if (!response.IsSuccessStatusCode)
             {
                 _log.LogWarning("MES 로그인 오류 {Code}", (int)response.StatusCode);
-                return (Outcome.Unavailable, null);
+                return (Outcome.Unavailable, null, null);
             }
 
             var body = await response.Content.ReadFromJsonAsync<MesLoginResponse>(cancellationToken: ct);
-            if (body?.User is null) return (Outcome.Unavailable, null);
+            if (body?.User is null) return (Outcome.Unavailable, null, null);
 
-            // 토큰은 스테이션·HMI에서 쓰지 않는다 (검사 기록은 스테이션 키로 보냄). 작업자 정보만 넘긴다.
-            return (Outcome.Ok, new LoginResult(body.User.EmployeeId, body.User.Name, body.User.Role, Offline: false));
+            return (Outcome.Ok, new LoginResult(body.User.EmployeeId, body.User.Name, body.User.Role, Offline: false),
+                body.AccessToken);
         }
         catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException && !ct.IsCancellationRequested)
         {
             _log.LogWarning("MES 로그인 연결 실패: {Message}", ex.Message);
-            return (Outcome.Unavailable, null);
+            return (Outcome.Unavailable, null, null);
         }
     }
 }

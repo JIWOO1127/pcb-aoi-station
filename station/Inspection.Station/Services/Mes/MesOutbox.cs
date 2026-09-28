@@ -22,6 +22,7 @@ public class MesOutbox
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web) { WriteIndented = true };
 
     private readonly MesOptions _options;
+    private readonly RecipeMetaStore _recipeMeta;
     private readonly ILogger<MesOutbox> _log;
     private readonly SemaphoreSlim _signal = new(0);
     private readonly object _statusLock = new();
@@ -30,9 +31,10 @@ public class MesOutbox
     private DateTimeOffset? _lastSuccessAt;
     private string? _lastError;
 
-    public MesOutbox(IOptions<MesOptions> options, ILogger<MesOutbox> log)
+    public MesOutbox(IOptions<MesOptions> options, RecipeMetaStore recipeMeta, ILogger<MesOutbox> log)
     {
         _options = options.Value;
+        _recipeMeta = recipeMeta;
         _log = log;
         Folder = Path.Combine(AppContext.BaseDirectory, _options.OutboxFolder);
         Directory.CreateDirectory(Folder);
@@ -46,8 +48,9 @@ public class MesOutbox
     {
         if (!_options.Enabled) return;
 
+        // 지금 레시피 파일이 MES에서 온 것이면 그 recipeId를 붙인다 (없으면 null → MES가 활성 레시피로 대체)
         var record = MesInspectionRecord.From(result, _options.StationId, productId, workerId,
-            DateTimeOffset.Now);
+            DateTimeOffset.Now, _recipeMeta.Get(productId)?.RecipeId);
 
         // 이름 앞에 시각을 붙여 "오래된 것부터" 정렬되게 한다
         string name = $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{result.InspectionId}.json";

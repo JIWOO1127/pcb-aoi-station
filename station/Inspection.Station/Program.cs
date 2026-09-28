@@ -14,7 +14,8 @@ builder.Services.AddHttpClient<IInferenceClient, InferenceClient>(client =>
     client.Timeout = TimeSpan.FromSeconds(20);
 });
 
-// 레시피(정답지) 공급. 지금은 JSON 파일, MES 준비되면 MesRecipeProvider로 교체.
+// 레시피(정답지) 공급: 실행 폴더의 Recipes/*.json. MES 레시피 동기화도 같은 폴더를 쓴다.
+builder.Services.AddSingleton(sp => RecipeFolder.FromConfig(sp.GetRequiredService<IConfiguration>()));
 builder.Services.AddSingleton<IRecipeProvider, FileRecipeProvider>();
 
 // 검사 흐름 지휘 (사진 → 추론 → 판정)
@@ -39,6 +40,22 @@ builder.Services.AddHttpClient<MesAuthClient>((sp, client) =>
     client.BaseAddress = new Uri(o.BaseUrl);
     client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
 });
+
+// 로그인 때 MES 활성 레시피 동기화 (Mes:RecipeSyncEnabled). 작업자 JWT로 조회하므로 스테이션 키 헤더는 붙이지 않는다.
+builder.Services.AddHttpClient("MesRecipes", (sp, client) =>
+{
+    var o = sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MesOptions>>().Value;
+    client.BaseAddress = new Uri(o.BaseUrl);
+    client.Timeout = TimeSpan.FromSeconds(o.TimeoutSeconds);
+});
+builder.Services.AddSingleton<RecipeMetaStore>();
+builder.Services.AddSingleton(sp => new RecipeSyncService(
+    () => sp.GetRequiredService<IHttpClientFactory>().CreateClient("MesRecipes"),
+    sp.GetRequiredService<Microsoft.Extensions.Options.IOptions<MesOptions>>(),
+    sp.GetRequiredService<RecipeFolder>(),
+    sp.GetRequiredService<RecipeMetaStore>(),
+    sp.GetRequiredService<IRecipeProvider>(),
+    sp.GetRequiredService<ILogger<RecipeSyncService>>()));
 
 var app = builder.Build();
 

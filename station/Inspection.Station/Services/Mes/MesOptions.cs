@@ -32,4 +32,16 @@ public class MesOptions
 
     /// <summary>쌓아둘 폴더 (실행 폴더 기준). 파일 하나 = 검사 기록 하나.</summary>
     public string OutboxFolder { get; set; } = "mes-outbox";
+
+    /// <summary>
+    /// 로그인할 때 MES의 활성 레시피를 받아 Recipes 폴더를 갱신할지.
+    /// 끄면(기본) 지금처럼 로컬 레시피 파일만 쓴다. 켜도 MES가 안 되면 로컬 파일로 그대로 검사한다.
+    /// </summary>
+    public bool RecipeSyncEnabled { get; set; } = false;
+
+    /// <summary>MES 레시피 API 경로 (목록 GET {경로}, 상세 GET {경로}/{recipeId}). 작업자 JWT로 호출한다.</summary>
+    public string RecipesPath { get; set; } = "/api/recipes";
+
+    /// <summary>로그인 때 레시피 동기화에 쓰는 최대 시간(초). 넘으면 동기화만 포기하고 로그인은 성공시킨다.</summary>
+    public int RecipeSyncTimeoutSeconds { get; set; } = 3;
 }

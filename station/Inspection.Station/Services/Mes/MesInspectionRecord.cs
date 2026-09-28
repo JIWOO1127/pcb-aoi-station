@@ -13,6 +13,7 @@ namespace Inspection.Station.Services.Mes;
 /// </summary>
 public record MesInspectionRecord(
     Guid InspectionId,          // 스테이션이 만든 ID. MES는 같은 ID가 다시 오면 저장하지 않는다 (재전송 중복 방지)
+    Guid? RecipeId,             // 판정에 쓴 레시피가 MES에서 받은 것이면 그 ID (recipes-meta.json). 아니면 null → MES가 활성 레시피로 대체
     string StationId,
     string ProductId,
     string? WorkerId,           // HMI 로그인 전에는 null
@@ -24,8 +25,8 @@ public record MesInspectionRecord(
     List<MesPartRecord> Parts)
 {
     public static MesInspectionRecord From(InspectionResult r, string stationId, string productId,
-        string? workerId, DateTimeOffset capturedAt) =>
-        new(r.InspectionId, stationId, productId, workerId,
+        string? workerId, DateTimeOffset capturedAt, Guid? recipeId = null) =>
+        new(r.InspectionId, recipeId, stationId, productId, workerId,
             r.Verdict.ToString().ToUpperInvariant(),
             r.DefectCount, r.ErrorCode, r.LatencyMs, capturedAt,
             r.Parts.Select(MesPartRecord.From).ToList());
