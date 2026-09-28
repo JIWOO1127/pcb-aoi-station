@@ -1,5 +1,3 @@
-import * as data from '../mocks/data';
-
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8080/api';
 let unauthorizedHandler = () => {};
 export const setUnauthorizedHandler = (handler) => { unauthorizedHandler = handler; };
@@ -17,11 +15,15 @@ async function request(path, options = {}) {
   return payload;
 }
 
-const delay = (value, ms = 180) => new Promise((resolve) => setTimeout(() => resolve(structuredClone(value)), ms));
-
 export const authService = { login: ({ employeeId, password }) => request('/auth/login', { method: 'POST', body: JSON.stringify({ employeeId, pin: password }) }), me: () => request('/auth/me') };
-export const dashboardService = { getSummary: () => delay({ hourly: data.hourlyData, defects: data.defectDistribution, recent: data.inspections.filter((item) => item.result === 'FAIL').slice(0, 5) }) };
-export const productService = { list: () => delay(data.products), get: (id) => delay(data.products.find((item) => item.id === id)) };
+export const dashboardService = { getSummary: () => request('/dashboard') };
+export const defectService = { getAnalytics: (filters = {}) => request(`/analytics/defects?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString()}`) };
+export const productService = {
+  list: () => request('/products'),
+  get: (id) => request(`/products/${id}`),
+  create: (product) => request('/products', { method: 'POST', body: JSON.stringify(product) }),
+  update: (id, product) => request(`/products/${id}`, { method: 'PUT', body: JSON.stringify(product) }),
+};
 export const recipeService = {
   list: () => request('/recipes'),
   get: (id) => request(`/recipes/${id}`),
@@ -31,8 +33,13 @@ export const inspectionService = {
   list: (filters = {}) => request(`/inspections?${new URLSearchParams(Object.entries(filters).filter(([, value]) => value)).toString()}`),
   get: (id) => request(`/inspections/${id}`),
 };
-export const stationService = { list: () => delay(data.stations), get: (id) => delay(data.stations.find((item) => item.id === id)) };
-export const modelService = { list: () => delay(data.models), get: (id) => delay(data.models.find((item) => item.id === id)) };
+export const stationService = { list: () => request('/stations'), get: (id) => request(`/stations/${id}`) };
+export const modelService = {
+  list: () => request('/models'),
+  get: (id) => request(`/models/${id}`),
+  create: (model) => request('/models', { method: 'POST', body: JSON.stringify(model) }),
+  activate: (id) => request(`/models/${id}/activate`, { method: 'POST' }),
+};
 export const userService = {
   list: () => request('/admin/users'),
   create: ({ employeeId, name, password, role, active }) => request('/admin/users', { method: 'POST', body: JSON.stringify({ employeeId, name, password, role, active }) }),
