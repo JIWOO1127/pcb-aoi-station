@@ -117,7 +117,7 @@ pcb-aoi-station/
 
 ## 5. DB 주요 테이블 (MES 소유)
 
-현재 스키마: `mes/pcb_manage/src/main/resources/db/migration`의 V1~V3 그대로 (main 기준).
+현재 스키마: `mes/pcb_manage/src/main/resources/db/migration`의 V1~V4 기준.
 
 ```mermaid
 erDiagram
@@ -142,6 +142,7 @@ erDiagram
         uuid recipe_id PK
         string product_id FK
         int version "UNIQUE (product_id, version)"
+        string note
         boolean active
         timestamptz created_at
     }
@@ -149,10 +150,7 @@ erDiagram
         uuid recipe_id PK, FK
         string part_id PK
         string expected_class
-        decimal x_mm
-        decimal y_mm
-        decimal tolerance_mm
-        string check_mode
+        jsonb holes
     }
     WORKER {
         string worker_id PK
@@ -169,9 +167,11 @@ erDiagram
         uuid inspection_id PK
         string product_id FK
         uuid recipe_id FK "NULL 허용"
-        string worker_id FK "NOT NULL"
-        string verdict "PASS | FAIL"
+        string worker_id FK "NULL 허용"
+        string station_id
+        string verdict "PASS | FAIL | INVALID"
         int defect_count
+        string error_code
         int latency_ms
         timestamptz captured_at
         timestamptz created_at
@@ -180,10 +180,11 @@ erDiagram
         uuid part_result_id PK
         uuid inspection_id FK "UNIQUE (inspection_id, part_id)"
         string part_id
+        string expected_class
         string detected_class
-        decimal confidence
-        decimal offset_mm
         string defect_type
+        jsonb expected_holes
+        jsonb covered_holes
     }
     CONFIRMATION {
         uuid confirmation_id PK
@@ -206,13 +207,13 @@ erDiagram
 
 - `inspection_id`는 스테이션이 생성한다. 같은 ID가 재전송되면 MES는 중복 저장하지 않는다 (409). 요청 형식은 `docs/api-contract.md`의 "검사 기록 API".
 - 확인 기록은 덮어쓰지 않고 추가만 한다 (감사 추적).
-- MES는 이미지와 이미지 경로를 저장하지 않는다.
-- V1의 `inspection.image_path` 컬럼은 쓰지 않으므로 위 그림에서 뺐다.
+- MES는 이미지와 이미지 경로를 전달받거나 저장하지 않는다.
+- V4에서 `inspection.image_path` 컬럼을 제거했다.
 - 레시피는 제품별로 버전을 두고(`RECIPE`), 부품 구성은 버전에 붙는다(`RECIPE_PART`).
 
-**제안(후속)** — V4 이후 마이그레이션. 위 그림(현재 스키마)에는 넣지 않았다. 자세한 내용은 `docs/api-contract.md` 검사 기록 API 3번.
+**V4 적용 사항** — 검사 기록 API와 핀홀 레시피를 위해 적용했다. 자세한 내용은 `docs/api-contract.md` 검사 기록 API 3번.
 
-| 테이블 | 제안 |
+| 테이블 | 변경 사항 |
 |---|---|
 | `inspection` | `verdict`에 `INVALID` 추가, `error_code`·`station_id` 추가, `worker_id` NULL 허용 (로그인 없이 검사한 경우) |
 | `part_result` | `expected_class` 추가, `expected_holes`·`covered_holes` 추가 |
