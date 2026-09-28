@@ -22,15 +22,36 @@ public class InspectionService {
     public void create(CreateInspectionRequest request) {
         if (repository.inspectionExists(request.inspectionId())) conflict("이미 저장된 검사 기록입니다.");
         if (!repository.productExists(request.productId())) badRequest("존재하지 않거나 비활성인 제품입니다.");
-        if (!repository.recipeMatches(request.recipeId(), request.productId())) badRequest("제품과 레시피가 일치하지 않습니다.");
+        UUID recipeId = resolveRecipeId(request);
         if (request.workerId() != null && !repository.workerExists(request.workerId())) {
             badRequest("존재하지 않거나 비활성인 작업자입니다.");
         }
         if ("INVALID".equals(request.verdict()) && !request.parts().isEmpty()) {
             badRequest("INVALID 검사의 parts는 비어 있어야 합니다.");
         }
-        repository.insert(request);
+        for (PartRequest part : request.parts()) {
+            boolean extra = "EXTRA".equals(part.defectType());
+            if (!extra && (part.expectedClass() == null || part.expectedClass().isBlank())) {
+                badRequest("EXTRA가 아닌 부품의 expectedClass는 필수입니다.");
+            }
+            if (extra && !part.expectedHoles().isEmpty()) {
+                badRequest("EXTRA 부품의 expectedHoles는 비어 있어야 합니다.");
+            }
+        }
+        repository.insert(request, recipeId);
         request.parts().forEach(part -> repository.insertPart(request.inspectionId(), part));
+    }
+
+    private UUID resolveRecipeId(CreateInspectionRequest request) {
+        if (request.recipeId() == null) {
+            return repository.activeRecipeId(request.productId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "제품에 활성 레시피가 없습니다."));
+        }
+        if (!repository.recipeMatches(request.recipeId(), request.productId())) {
+            badRequest("제품과 레시피가 일치하지 않습니다.");
+        }
+        return request.recipeId();
     }
 
     public List<InspectionSummary> list(String verdict, String productId, String stationId) {
