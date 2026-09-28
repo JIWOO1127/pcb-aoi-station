@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Activity, BarChart3, Boxes, ChevronLeft, ChevronRight, ClipboardList, Cpu, FileClock, Gauge, LayoutDashboard, LogOut, Menu, Package, PanelLeftClose, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import { stationService } from '../services/api';
 
 const groups = [
   { items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -15,8 +16,29 @@ const groups = [
 export default function AppLayout() {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [currentTime, setCurrentTime] = useState(new Date());
+  const [stationSummary, setStationSummary] = useState({ connected: 0, total: 0, hasError: false });
+
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(new Date());
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, []);
+  useEffect(() => {
+    const loadStations = () => stationService.list().then((stations) => setStationSummary({
+      connected: stations.filter((station) => station.status !== 'OFFLINE').length,
+      total: stations.length,
+      hasError: stations.some((station) => station.status === 'ERROR'),
+    })).catch(() => {});
+    loadStations();
+    const timer = setInterval(loadStations, 10000);
+    return () => clearInterval(timer);
+  }, []);
+
   return <div className={`app-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><Boxes size={22} /></div><div className="brand-copy"><strong>PCB AOI</strong><span>Manufacturing MES</span></div><button className="mobile-close" onClick={() => setMobileOpen(false)}><X size={20} /></button></div>
@@ -26,9 +48,25 @@ export default function AppLayout() {
     </aside>
     {mobileOpen && <div className="mobile-overlay" onClick={() => setMobileOpen(false)} />}
     <div className="main-shell">
-      <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><div className="system-state"><Activity size={16} /><span>System normal</span><b>5 / 6 Stations</b></div><div className="topbar-right"><div className="clock"><small>현재 시각</small><strong>{new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })} 15:48 KST</strong></div><div className="user-block"><span className="avatar">{currentUser.name.slice(0, 1)}</span><div><strong>{currentUser.name}</strong><small>{currentUser.role}</small></div></div><button className="logout" onClick={() => { logout(); navigate('/login', { replace: true }); }} title="로그아웃"><LogOut size={18} /></button></div></header>
+      <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><div className="system-state"><Activity size={16} /><span>{stationSummary.hasError ? 'Station error' : 'System normal'}</span><b>{stationSummary.connected} / {stationSummary.total} Stations</b></div><div className="topbar-right">
+        <div className="clock">
+  <small>현재 시각</small>
+  <strong>
+    {currentTime.toLocaleDateString('ko-KR', {
+      month: '2-digit',
+      day: '2-digit',
+    })}{' '}
+    {currentTime.toLocaleTimeString('ko-KR', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    })}{' '}
+    KST
+  </strong>
+</div>
+        <div className="user-block"><span className="avatar">{currentUser.name.slice(0, 1)}</span><div><strong>{currentUser.name}</strong><small>{currentUser.role}</small></div></div><button className="logout" onClick={() => { logout(); navigate('/login', { replace: true }); }} title="로그아웃"><LogOut size={18} /></button></div></header>
       <main className="content"><Outlet /></main>
-      <footer className="footer"><span>PCB AOI Manufacturing Execution System</span><span>MES Web v1.0.0 · API MOCK MODE</span></footer>
+      <footer className="footer"><span>PCB AOI Manufacturing Execution System</span><span>MES Web v1.0.0 · LIVE API</span></footer>
     </div>
   </div>;
 }
