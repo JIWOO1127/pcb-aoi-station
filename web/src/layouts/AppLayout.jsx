@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Activity, BarChart3, Boxes, ChevronLeft, ChevronRight, ClipboardList, Cpu, FileClock, Gauge, LayoutDashboard, LogOut, Menu, Package, PanelLeftClose, Settings, ShieldCheck, Users, X } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
+import useCurrentTime from '../hooks/useCurrentTime';
 
 const groups = [
   { items: [{ to: '/dashboard', label: 'Dashboard', icon: LayoutDashboard }] },
@@ -17,6 +18,11 @@ export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const navigate = useNavigate();
   const { user: currentUser, logout } = useAuth();
+  const now = useCurrentTime();
+  const currentTime = now.toLocaleString('ko-KR', {
+    timeZone: 'Asia/Seoul', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+  });
   return <div className={`app-shell ${collapsed ? 'sidebar-collapsed' : ''}`}>
     <aside className={`sidebar ${mobileOpen ? 'mobile-open' : ''}`}>
       <div className="brand"><div className="brand-mark"><Boxes size={22} /></div><div className="brand-copy"><strong>PCB AOI</strong><span>Manufacturing MES</span></div><button className="mobile-close" onClick={() => setMobileOpen(false)}><X size={20} /></button></div>
@@ -26,9 +32,9 @@ export default function AppLayout() {
     </aside>
     {mobileOpen && <div className="mobile-overlay" onClick={() => setMobileOpen(false)} />}
     <div className="main-shell">
-      <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><div className="system-state"><Activity size={16} /><span>System normal</span><b>5 / 6 Stations</b></div><div className="topbar-right"><div className="clock"><small>현재 시각</small><strong>{new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' })} 15:48 KST</strong></div><div className="user-block"><span className="avatar">{currentUser.name.slice(0, 1)}</span><div><strong>{currentUser.name}</strong><small>{currentUser.role}</small></div></div><button className="logout" onClick={() => { logout(); navigate('/login', { replace: true }); }} title="로그아웃"><LogOut size={18} /></button></div></header>
+      <header className="topbar"><button className="mobile-menu" onClick={() => setMobileOpen(true)}><Menu size={20} /></button><div className="system-state"><Activity size={16} /><span>System normal</span><b>5 / 6 Stations</b></div><div className="topbar-right"><div className="clock"><small>현재 시각</small><strong>{currentTime} KST</strong></div><div className="user-block"><span className="avatar">{currentUser.name.slice(0, 1)}</span><div><strong>{currentUser.name}</strong><small>{currentUser.role}</small></div></div><button className="logout" onClick={() => { logout(); navigate('/login', { replace: true }); }} title="로그아웃"><LogOut size={18} /></button></div></header>
       <main className="content"><Outlet /></main>
-      <footer className="footer"><span>PCB AOI Manufacturing Execution System</span><span>MES Web v1.0.0 · API MOCK MODE</span></footer>
+      <footer className="footer"><span>PCB AOI Manufacturing Execution System</span><span>MES Web v1.0.0 · LIVE API</span></footer>
     </div>
   </div>;
 }

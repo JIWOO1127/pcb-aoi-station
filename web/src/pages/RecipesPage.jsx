@@ -61,7 +61,7 @@ export default function RecipesPage() {
     {error && <div className="info-banner"><b>레시피 조회 실패</b><span>{error}</span></div>}
     <div className="list-summary"><span>레시피 목록</span><b>{rows.length}</b><small>개 버전</small></div>
     <div className="panel table-panel">
-      {loading ? <LoadingState /> : <DataTable columns={columns} rows={rows} onRowClick={(row) => navigate(`/recipes/${row.recipeId}`)} />}
+      {loading ? <LoadingState /> : <DataTable columns={columns} rows={rows} emptyText={items.length ? '검색 조건에 맞는 레시피가 없습니다.' : '등록된 레시피가 없습니다.'} onRowClick={(row) => navigate(`/recipes/${row.recipeId}`)} />}
     </div>
   </>;
 }
