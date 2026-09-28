@@ -45,7 +45,7 @@ public class InspectionController {
 
     public record CreateInspectionRequest(
             @NotNull UUID inspectionId,
-            @NotNull UUID recipeId,
+            UUID recipeId,
             @NotBlank @Size(max = 50) String stationId,
             @NotBlank @Size(max = 50) String productId,
             @Size(max = 50) String workerId,
@@ -58,9 +58,9 @@ public class InspectionController {
 
     public record PartRequest(
             @NotBlank @Size(max = 50) String partId,
-            @NotBlank @Size(max = 100) String expectedClass,
+            @Size(max = 100) String expectedClass,
             @Size(max = 100) String detectedClass,
-            @Size(max = 30) String defectType,
+            @Pattern(regexp = "MISSING|WRONG_PART|WIRE_COLOR_SWAP|OFFSET|EXTRA") String defectType,
             @NotNull List<@Pattern(regexp = "[A-U](?:[0-9]|1[0-3])") String> expectedHoles,
             @NotNull List<@Pattern(regexp = "[A-U](?:[0-9]|1[0-3])") String> coveredHoles) {}
 
