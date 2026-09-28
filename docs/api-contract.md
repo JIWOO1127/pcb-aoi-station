@@ -88,10 +88,10 @@
 
 ---
 
-## 스테이션 → MES: 검사 기록 API (MVP-25) — 초안, 2026-09-27
+## 스테이션 → MES: 검사 기록 API (MVP-25) — 구현, 2026-09-28
 
 작성 서지우(스테이션) · 검토 이하연(MES). 기준: main의 MES 스키마(마이그레이션 V1~V3)와 인증 API.
-스테이션 쪽 구현: `station/Inspection.Station/Services/Mes/` (보관 후 재전송).
+스테이션 쪽 구현 예정: 검사 완료 후 전송하고, 실패 시 로컬 보관 후 재전송.
 
 ### 요약
 
@@ -128,8 +128,9 @@ X-Station-Key: <스테이션 키>
 ```json
 {
   "inspectionId": "3f2a9c1e-5b7d-4e8a-9c21-7d4e5f6a8b90",
+  "recipeId": "7bafaa9d-4d9f-4d2e-bc04-0db47d401003",
   "stationId": "ST-01",
-  "productId": "NE555-A",
+  "productId": "NE555-B",
   "workerId": "A-1042",
   "verdict": "FAIL",
   "defectCount": 1,
@@ -160,8 +161,9 @@ X-Station-Key: <스테이션 키>
 | 필드 | 타입 | 필수 | 설명 |
 |---|---|---|---|
 | inspectionId | UUID | O | 스테이션이 만든 ID. **중복 판단 기준** |
+| recipeId | UUID | O | 검사에 사용한 레시피 ID. productId와 일치해야 함 |
 | stationId | string | O | 스테이션 이름 (`ST-01`) |
-| productId | string | O | `product` 테이블에 있어야 함 (`NE555-A`) |
+| productId | string | O | `product` 테이블에 있어야 함 (`NE555-B`) |
 | workerId | string \| null | - | HMI 로그인 사번. **NULL 허용**: 로그인 없이 검사한 경우 null (`inspection.worker_id`도 NULL 허용) |
 | verdict | string | O | `PASS` \| `FAIL` \| `INVALID` (판정 불가) |
 | defectCount | int | O | 불량 부품 수 |
@@ -187,9 +189,9 @@ X-Station-Key: <스테이션 키>
 | 본문 오류 (필수값 누락, 없는 productId 등) | 400 / 422 | `{"message":"..."}` | 따로 빼 둠 (사람이 확인) |
 | MES 내부 오류 | 5xx | - | 잠시 뒤 재시도 |
 
-### 3. 현재 스키마(V1~V3)와 맞추려면 필요한 변경 (제안: V4 이후 마이그레이션)
+### 3. 스키마 변경 (V4 적용)
 
-main의 마지막 마이그레이션은 V3이므로 V4 이후 번호로 한다 (정확한 번호는 MES 담당이 정함).
+`V4__remove_inspection_image_path.sql`에서 아래 변경을 적용한다.
 
 | 문제 | 제안 |
 |---|---|
@@ -201,26 +203,12 @@ main의 마지막 마이그레이션은 V3이므로 V4 이후 번호로 한다 (
 | `recipe_part`가 mm 좌표 기준 (`x_mm`, `y_mm`, `tolerance_mm`) | `holes` 추가 (레시피 홀 목록) — 배열 형태(예: `["E9","H9"]`), JSONB 배열로 저장. mm 컬럼은 정리 |
 | `part_result.offset_mm`, `confidence` | 사용 안 함, NULL로 둠 |
 | `part_result_id` | MES가 생성 (`gen_random_uuid()` 또는 JPA에서 UUID) |
-| `product`에 `NE555-A` 필요 (FK) | 시드 데이터로 추가 |
+| `product`에 `NE555-B` 필요 (FK) | 시드 데이터로 추가 |
 | 시드 작업자 없음 | 시연용 작업자 1~2명 시드 (PIN은 BCrypt 해시) |
 
-```sql
--- V4 이후 마이그레이션 예시 (main의 마지막 번호는 V3 — 번호·내용은 MES 담당자가 맞게 수정)
-ALTER TABLE inspection DROP CONSTRAINT IF EXISTS inspection_verdict_check;
-ALTER TABLE inspection ADD CONSTRAINT inspection_verdict_check CHECK (verdict IN ('PASS','FAIL','INVALID'));
-ALTER TABLE inspection ADD COLUMN error_code VARCHAR(50);
-ALTER TABLE inspection ADD COLUMN station_id VARCHAR(50);
-ALTER TABLE inspection ALTER COLUMN worker_id DROP NOT NULL;   -- 로그인 없이 검사한 경우
-ALTER TABLE part_result ADD COLUMN expected_class VARCHAR(100);
-ALTER TABLE part_result ADD COLUMN expected_holes JSONB;
-ALTER TABLE part_result ADD COLUMN covered_holes JSONB;
-ALTER TABLE recipe_part ADD COLUMN holes JSONB;
-```
-(CHECK 제약 이름은 V1에서 실제로 붙은 이름을 확인해서 바꿔야 한다.)
+### 4. 조회 API (Web 연동)
 
-### 4. 시연에 필요한 조회 API (Web 연동용, 선택)
-
-- `GET /api/inspections?from=&to=&verdict=` → 최근 검사 목록 (MVP-43)
+- `GET /api/inspections?verdict=&productId=&stationId=` → 최근 검사 목록
 - `GET /api/inspections/{id}` → 부품별 결과 포함
 - 인증은 JWT (`Authorization: Bearer`) — 위 1번의 인증 범위 표 참고. 응답 모양은 아래 "후속 작업"에서 정한다.
 
@@ -251,7 +239,7 @@ X-Station-Key: <스테이션 키>
 
 응답은 검사 기록과 같다 (201 / 409 / 400·422 / 5xx). `{inspectionId}`가 아직 MES에 없으면(검사 기록이 보관함에서 대기 중) `404` → 스테이션은 잠시 뒤 재시도한다. 스테이션은 검사 기록을 먼저, 확인 기록을 나중에 보내므로 순서가 맞으면 404는 거의 생기지 않는다.
 
-> 구현 상태: 스테이션·HMI 쪽 전송은 아직 없음 (MVP-11 남은 작업).
+> 구현 상태: 스테이션·HMI 쪽 전송은 아직 없음. 이 문서의 요청 형식에 맞춰 스테이션 담당자가 구현한다.
 
 ### 6. 합의할 것 (월요일 아침)
 
@@ -266,4 +254,4 @@ X-Station-Key: <스테이션 키>
 - **레시피 홀 기준 전환**: 박스가 덮은 홀 → 부품 다리가 꽂힌 홀 (inference MVP-32, 레시피 NE555-A v4 / NE555-B v2).
   전환 후 `expectedHoles`·`coveredHoles`는 다리 홀만 담는다 (예: 전선·저항 2개, IC 14개). 위 본문 예시는 전환 전 형식이다.
 - **웹 조회 응답 계약**: `GET /api/inspections`, `GET /api/inspections/{id}`의 응답 JSON 모양 (목록 필드, 페이지 처리, 부품별 결과 포함 범위).
-- **실제 MES 검사 기록 저장, 웹 연동**: MES에 `POST /api/inspections`·확인 기록 API와 스테이션 키 인증 구현, 위 제안 마이그레이션 적용, 관리자 웹의 검사 기록 화면 연동.
+- **스테이션·HMI 전송 연동**: 검사 기록과 확인 기록 API 호출, 연결 실패 시 로컬 보관 후 재전송을 스테이션 담당자가 구현한다.

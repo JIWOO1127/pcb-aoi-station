@@ -1,21 +1,58 @@
-import { ArrowLeft, Clock3, Cpu, MapPin, Package } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ArrowLeft, Clock3, MapPin, Package, UserRound } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { inspections } from '../mocks/data';
-import { DataTable, PageHeader, Panel, PcbBoard, StatusBadge } from '../components/UI';
+import { inspectionService } from '../services/api';
+import { DataTable, LoadingState, PageHeader, Panel, StatusBadge } from '../components/UI';
 
-const detections = [
-  { id: 1, className: 'ic_chip', confidence: '99.2%', bbox: '[182, 96, 112, 84]' }, { id: 2, className: 'ic_chip', confidence: '98.8%', bbox: '[418, 102, 110, 82]' },
-  { id: 3, className: 'led', confidence: '98.1%', bbox: '[356, 104, 42, 38]' }, { id: 4, className: 'capacitor', confidence: '97.4%', bbox: '[214, 226, 54, 72]' },
-  { id: 5, className: 'resistance330', confidence: '96.9%', bbox: '[402, 218, 84, 32]' }, { id: 6, className: 'red_wire', confidence: '95.7%', bbox: '[92, 284, 126, 28]' },
-];
+const formatDate = (value) => value ? new Date(value).toLocaleString('ko-KR') : '-';
 
 export default function InspectionDetailPage() {
-  const { inspectionId } = useParams(); const navigate = useNavigate();
-  const item = inspections.find((row) => row.id === inspectionId) || inspections[0];
-  const columns = [{ key: 'className', label: 'Class', render: (v) => <code className="class-code">{v}</code> }, { key: 'confidence', label: 'Confidence' }, { key: 'bbox', label: 'Bounding Box' }];
-  return <><button className="back-button" onClick={() => navigate('/inspections')}><ArrowLeft size={16} /> 검사 이력</button><PageHeader eyebrow="INSPECTION DETAIL" title={item.id} description="Station에서 전송된 검사 결과 원본입니다." action={<StatusBadge value={item.result} />} />
-    <div className="inspection-layout"><Panel title="검사 이미지" subtitle="Object Detection 결과"><PcbBoard defect={item.result === 'FAIL'} /><div className="board-legend"><span><i className="green" /> 정상 검출</span><span><i className="red" /> 불량 후보</span><span>1280 × 960</span></div></Panel><Panel title="검사 정보" subtitle="판정 및 실행 환경"><div className="info-list"><div><span><Package size={16} /> Product</span><b>{item.product}</b></div><div><span><MapPin size={16} /> Station</span><b>{item.station}</b></div><div><span><Clock3 size={16} /> Inspection Time</span><b>{item.time}</b></div><div><span>Recipe Version</span><b>{item.recipe}</b></div><div><span><Cpu size={16} /> AI Model</span><b>{item.model}</b></div><div><span>Result</span><StatusBadge value={item.result} /></div></div></Panel></div>
-    {item.result === 'FAIL' && <div className="defect-detail"><div className="defect-title"><span>!</span><div><p>DEFECT DETAIL</p><h3>{item.defect}</h3></div></div><div><span>Expected</span><b>LED count = 2</b></div><div><span>Detected</span><b className="danger-text">LED count = 1</b></div><div><span>판정 주체</span><b>C# Station Server</b></div></div>}
-    <Panel title="Detection 결과" subtitle={`총 ${detections.length}개 객체 검출`}><DataTable columns={columns} rows={detections} pageSize={8} /></Panel>
+  const { inspectionId } = useParams();
+  const navigate = useNavigate();
+  const [item, setItem] = useState(null);
+  const [error, setError] = useState('');
+
+  useEffect(() => {
+    inspectionService.get(inspectionId).then(setItem).catch((reason) => setError(reason.message));
+  }, [inspectionId]);
+
+  const columns = [
+    { key: 'partId', label: '부품 ID', render: (value) => <b>{value}</b> },
+    { key: 'expectedClass', label: '예상 클래스', render: (value) => <code className="class-code">{value}</code> },
+    { key: 'detectedClass', label: '검출 클래스', render: (value) => value || '-' },
+    { key: 'expectedHoles', label: '예상 핀홀', render: (value) => value?.join(', ') || '-' },
+    { key: 'coveredHoles', label: '검출 핀홀', render: (value) => value?.join(', ') || '-' },
+    { key: 'defectType', label: '불량 유형', render: (value) => value || '정상' },
+  ];
+
+  return <>
+    <button className="back-button" onClick={() => navigate('/inspections')}><ArrowLeft size={16} /> 검사 기록</button>
+    {error && <div className="info-banner"><b>검사 기록 조회 실패</b><span>{error}</span></div>}
+    {!item ? <LoadingState /> : <>
+      <PageHeader eyebrow="INSPECTION DETAIL" title={item.inspectionId} description="스테이션에서 전송한 구조화된 검사 결과입니다." action={<StatusBadge value={item.verdict} />} />
+      <div className="inspection-layout">
+        <Panel title="검사 정보" subtitle="판정 및 실행 환경">
+          <div className="info-list">
+            <div><span><Package size={16} /> 제품</span><b>{item.productId}</b></div>
+            <div><span><MapPin size={16} /> 스테이션</span><b>{item.stationId || '-'}</b></div>
+            <div><span><Clock3 size={16} /> 검사 시간</span><b>{formatDate(item.capturedAt)}</b></div>
+            <div><span><UserRound size={16} /> 작업자</span><b>{item.workerId || '-'}</b></div>
+            <div><span>레시피</span><b>v{item.recipeVersion}</b></div>
+            <div><span>레시피 ID</span><b>{item.recipeId}</b></div>
+          </div>
+        </Panel>
+        <Panel title="처리 결과" subtitle="검사 판정과 처리 시간">
+          <div className="info-list">
+            <div><span>판정</span><StatusBadge value={item.verdict} /></div>
+            <div><span>불량 수</span><b>{item.defectCount}</b></div>
+            <div><span>처리 시간</span><b>{item.latencyMs} ms</b></div>
+            <div><span>오류 코드</span><b>{item.errorCode || '-'}</b></div>
+          </div>
+        </Panel>
+      </div>
+      <Panel title="부품별 검사 결과" subtitle={`총 ${item.parts.length}개 부품`}>
+        <DataTable columns={columns} rows={item.parts.map((part) => ({ ...part, id: part.partId }))} pageSize={20} />
+      </Panel>
+    </>}
   </>;
 }
