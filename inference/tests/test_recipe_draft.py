@@ -198,6 +198,7 @@ class EndpointTests(unittest.TestCase):
         self.assertEqual((body["overlay"]["width"], body["overlay"]["height"]), (100, 120))
         self.assertEqual(len(body["overlay"]["holes"]), len(self.holes))
         self.assertEqual(set(body["overlay"]["holes"][0]), {"label", "x", "y"})
+        self.assertTrue(all(isinstance(h["x"], int) and isinstance(h["y"], int) for h in body["overlay"]["holes"]))
         self.assertTrue(cv2.imdecode(np.frombuffer(__import__("base64").b64decode(body["overlay"]["image"]), np.uint8),
                                      cv2.IMREAD_COLOR) is not None)
         for p in body["parts"]:
@@ -215,7 +216,12 @@ class EndpointTests(unittest.TestCase):
         if not SAMPLE.exists():
             self.skipTest(f"합의 샘플 없음: {SAMPLE}")
         sample = json.loads(SAMPLE.read_text(encoding="utf-8-sig"))
-        self.assertEqual(_type_shape(self.ok_response()), _type_shape(sample))
+        actual, expected = _type_shape(self.ok_response()), _type_shape(sample)
+        # 샘플은 사진 대신 overlay.image를 null로 둔다 → 그때는 문자열 또는 null 둘 다 허용
+        if sample["overlay"]["image"] is None:
+            self.assertIn(actual["overlay"]["image"], ("str", "NoneType"))
+            actual["overlay"]["image"] = expected["overlay"]["image"]
+        self.assertEqual(actual, expected)
 
     def test_필드가_없으면_400(self):
         for files, data in [(None, {"productId": "X"}),
