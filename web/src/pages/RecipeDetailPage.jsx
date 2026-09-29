@@ -30,7 +30,7 @@ export default function RecipeDetailPage() {
         eyebrow={`${recipe.productId} / RECIPE`}
         title={`${recipe.productId} v${recipe.version}`}
         description={`레시피 ID: ${recipe.recipeId}`}
-        action={<StatusBadge value={recipe.active ? 'ACTIVE' : 'INACTIVE'} dot />}
+        action={<StatusBadge value={recipe.status || (recipe.active ? 'ACTIVE' : 'INACTIVE')} dot />}
       />
       <div className="detail-summary">
         <div><span>레시피 ID</span><b>{recipe.recipeId}</b></div>
