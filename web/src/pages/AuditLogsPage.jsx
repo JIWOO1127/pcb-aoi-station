@@ -3,7 +3,24 @@ import { Download } from 'lucide-react';
 import { auditService } from '../services/api';
 import { DataTable, Field, LoadingState, PageHeader, SearchFilter } from '../components/UI';
 
-const emptyFilters = { actorId: '', action: '', from: '', to: '' };
+// 오늘 날짜를 YYYY-MM-DD 형식으로 반환
+const getToday = () => {
+  const now = new Date();
+
+  const year = now.getFullYear();
+  const month = String(now.getMonth() + 1).padStart(2, '0');
+  const day = String(now.getDate()).padStart(2, '0');
+
+  return `${year}-${month}-${day}`;
+};
+
+
+const emptyFilters = {
+  actorId: '',
+  action: '',
+  from: getToday(),
+  to: getToday(),
+};
 
 export default function AuditLogsPage() {
   const [rows, setRows] = useState([]);

@@ -31,7 +31,7 @@ export function Field({ label, children }) {
   return <label className="field"><span>{label}</span>{children}</label>;
 }
 
-export function DataTable({ columns, rows, onRowClick, pageSize = 6, emptyText = '조회된 데이터가 없습니다.' }) {
+export function DataTable({ columns, rows, onRowClick, pageSize = 10, emptyText = '조회된 데이터가 없습니다.' }) {
   const [page, setPage] = useState(1);
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   useEffect(() => { setPage(1); }, [rows, pageSize]);
