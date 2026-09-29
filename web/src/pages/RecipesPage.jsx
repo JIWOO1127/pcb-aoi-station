@@ -74,7 +74,9 @@ export default function RecipesPage() {
         .map((item) => ({
           ...item,
           id: item.recipeId,
-          status: item.status || (item.active ? 'ACTIVE' : 'INACTIVE'),
+          status:
+            item.status ||
+            (item.active ? 'ACTIVE' : 'INACTIVE'),
           createdAtLabel: formatDate(item.createdAt),
         }))
         .filter(
@@ -84,15 +86,18 @@ export default function RecipesPage() {
         ),
     [items, product, status],
   );
-
   const products = [...new Set(items.map((item) => item.productId))];
-  const activeProducts = productItems.filter((item) => item.status === 'ACTIVE');
 
+  const activeProducts = productItems.filter(
+    (item) => item.status === 'ACTIVE'
+  );
   const columns = [
     {
       key: 'recipeId',
       label: '레시피 ID',
-      render: (value) => <b className="cell-id">{value}</b>,
+      render: (value) => (
+        <b className="cell-id">{value}</b>
+      ),
     },
     {
       key: 'productId',
@@ -102,7 +107,11 @@ export default function RecipesPage() {
       key: 'version',
       label: '버전',
       render: (value, row) => (
-        <span className={row.active ? 'version-active' : 'version-tag'}>
+        <span
+          className={
+            row.active ? 'version-active' : 'version-tag'
+          }
+        >
           v{value}
         </span>
       ),
@@ -115,7 +124,9 @@ export default function RecipesPage() {
     {
       key: 'status',
       label: '상태',
-      render: (value) => <StatusBadge value={value} dot />,
+      render: (value) => (
+        <StatusBadge value={value} dot />
+      ),
     },
     {
       key: 'createdAtLabel',
@@ -138,9 +149,16 @@ export default function RecipesPage() {
   const getDefaultSource = (productId) => {
     const recipes = items
       .filter((item) => item.productId === productId)
-      .sort((a, b) => Number(b.version) - Number(a.version));
+      .sort(
+        (a, b) =>
+          Number(b.version) - Number(a.version),
+      );
 
-    return recipes.find((item) => item.active) || recipes[0] || null;
+    return (
+      recipes.find((item) => item.active) ||
+      recipes[0] ||
+      null
+    );
   };
 
   // Recipe 상세를 읽어서 폼에 복사
@@ -167,12 +185,13 @@ export default function RecipesPage() {
         parts:
           source.parts?.length > 0
             ? source.parts.map((part) => ({
-              partId: part.partId || '',
-              expectedClass: part.expectedClass || '',
-              holes: Array.isArray(part.holes)
-                ? part.holes.join(', ')
-                : part.holes || '',
-            }))
+                partId: part.partId || '',
+                expectedClass:
+                  part.expectedClass || '',
+                holes: Array.isArray(part.holes)
+                  ? part.holes.join(', ')
+                  : part.holes || '',
+              }))
             : [emptyPart()],
       }));
     } catch (reason) {
@@ -180,10 +199,16 @@ export default function RecipesPage() {
     }
   };
 
-  // 새 레시피 버튼
+  // 새 레시피 버튼  
   const openCreate = async () => {
-    const selectedProductIsActive = activeProducts.some((item) => item.id === product);
-    const productId = selectedProductIsActive ? product : activeProducts[0]?.id || '';
+    const selectedProductIsActive = activeProducts.some(
+      (item) => item.id === product
+    );
+
+    const productId = selectedProductIsActive
+      ? product
+      : activeProducts[0]?.id || '';
+
     const source = getDefaultSource(productId);
 
     setError('');
@@ -204,7 +229,9 @@ export default function RecipesPage() {
     // ACTIVE Recipe가 있으면 처음부터 값도 자동으로 가져옴
     if (source) {
       try {
-        const detail = await recipeService.get(source.recipeId);
+        const detail = await recipeService.get(
+          source.recipeId,
+        );
 
         setForm({
           productId: detail.productId,
@@ -213,12 +240,13 @@ export default function RecipesPage() {
           parts:
             detail.parts?.length > 0
               ? detail.parts.map((part) => ({
-                partId: part.partId || '',
-                expectedClass: part.expectedClass || '',
-                holes: Array.isArray(part.holes)
-                  ? part.holes.join(', ')
-                  : part.holes || '',
-              }))
+                  partId: part.partId || '',
+                  expectedClass:
+                    part.expectedClass || '',
+                  holes: Array.isArray(part.holes)
+                    ? part.holes.join(', ')
+                    : part.holes || '',
+                }))
               : [emptyPart()],
         });
       } catch (reason) {
@@ -242,7 +270,9 @@ export default function RecipesPage() {
       setSourceRecipeId(source.recipeId);
 
       try {
-        const detail = await recipeService.get(source.recipeId);
+        const detail = await recipeService.get(
+          source.recipeId,
+        );
 
         setForm({
           productId,
@@ -251,12 +281,13 @@ export default function RecipesPage() {
           parts:
             detail.parts?.length > 0
               ? detail.parts.map((part) => ({
-                partId: part.partId || '',
-                expectedClass: part.expectedClass || '',
-                holes: Array.isArray(part.holes)
-                  ? part.holes.join(', ')
-                  : part.holes || '',
-              }))
+                  partId: part.partId || '',
+                  expectedClass:
+                    part.expectedClass || '',
+                  holes: Array.isArray(part.holes)
+                    ? part.holes.join(', ')
+                    : part.holes || '',
+                }))
               : [emptyPart()],
         });
       } catch (reason) {
@@ -287,10 +318,12 @@ export default function RecipesPage() {
 
     if (!source) {
       setSourceRecipeId('');
+
       setForm((current) => ({
         ...current,
         parts: [emptyPart()],
       }));
+
       return;
     }
 
@@ -307,6 +340,7 @@ export default function RecipesPage() {
         ...current,
         parts: [emptyPart()],
       }));
+
       return;
     }
 
@@ -317,10 +351,11 @@ export default function RecipesPage() {
   const updatePart = (index, key, value) => {
     setForm((current) => ({
       ...current,
-      parts: current.parts.map((part, partIndex) =>
-        partIndex === index
-          ? { ...part, [key]: value }
-          : part,
+      parts: current.parts.map(
+        (part, partIndex) =>
+          partIndex === index
+            ? { ...part, [key]: value }
+            : part,
       ),
     }));
   };
@@ -342,7 +377,9 @@ export default function RecipesPage() {
       !Number.isInteger(Number(form.version)) ||
       Number(form.version) < 1
     ) {
-      setError('제품 ID와 1 이상의 버전을 입력해 주세요.');
+      setError(
+        '제품 ID와 1 이상의 버전을 입력해 주세요.',
+      );
       return;
     }
 
@@ -355,7 +392,9 @@ export default function RecipesPage() {
           !part.holes.length,
       )
     ) {
-      setError('각 부품의 ID, 예상 클래스, 홀을 모두 입력해 주세요.');
+      setError(
+        '각 부품의 ID, 예상 클래스, 홀을 모두 입력해 주세요.',
+      );
       return;
     }
 
@@ -383,8 +422,15 @@ export default function RecipesPage() {
   // 현재 제품에서 복제할 수 있는 Recipe 목록
   const copyCandidates = form
     ? items
-      .filter((item) => item.productId === form.productId)
-      .sort((a, b) => Number(b.version) - Number(a.version))
+        .filter(
+          (item) =>
+            item.productId === form.productId,
+        )
+        .sort(
+          (a, b) =>
+            Number(b.version) -
+            Number(a.version),
+        )
     : [];
 
   return (
@@ -394,10 +440,27 @@ export default function RecipesPage() {
         title="레시피 관리"
         description="제품별 검사 레시피와 부품 기준을 조회합니다."
         action={
-          canCreate && <>
-            <button className="btn btn-ghost" onClick={openCreate}><Plus size={16} /> 직접 등록</button>
-            <button className="btn btn-primary" onClick={() => navigate('/recipes/photo/new')}><Camera size={16} /> 사진으로 등록</button>
-          </>
+          canCreate && (
+            <>
+              <button
+                className="btn btn-ghost"
+                onClick={openCreate}
+              >
+                <Plus size={16} />
+                직접 등록
+              </button>
+
+              <button
+                className="btn btn-primary"
+                onClick={() =>
+                  navigate('/recipes/photo/new')
+                }
+              >
+                <Camera size={16} />
+                사진으로 등록
+              </button>
+            </>
+          )
         }
       />
 
@@ -417,7 +480,10 @@ export default function RecipesPage() {
             <option value="">전체 제품</option>
 
             {products.map((value) => (
-              <option key={value} value={value}>
+              <option
+                key={value}
+                value={value}
+              >
                 {value}
               </option>
             ))}
@@ -432,9 +498,15 @@ export default function RecipesPage() {
             }
           >
             <option value="">전체 상태</option>
-            <option value="ACTIVE">활성</option>
-            <option value="DRAFT">초안</option>
-            <option value="ARCHIVED">이전 버전</option>
+            <option value="ACTIVE">
+              활성
+            </option>
+            <option value="DRAFT">
+              초안
+            </option>
+            <option value="ARCHIVED">
+              이전 버전
+            </option>
           </select>
         </Field>
       </SearchFilter>
@@ -459,8 +531,15 @@ export default function RecipesPage() {
           <DataTable
             columns={columns}
             rows={rows}
+            emptyText={
+              items.length
+                ? '검색 조건에 맞는 레시피가 없습니다.'
+                : '등록된 레시피가 없습니다.'
+            }
             onRowClick={(row) =>
-              navigate(`/recipes/${row.recipeId}`)
+              navigate(
+                `/recipes/${row.recipeId}`,
+              )
             }
           />
         )}
@@ -469,7 +548,9 @@ export default function RecipesPage() {
       <Modal
         open={!!form}
         title="새 레시피 만들기"
-        onClose={() => !saving && setForm(null)}
+        onClose={() =>
+          !saving && setForm(null)
+        }
         footer={
           <>
             <button
@@ -485,7 +566,9 @@ export default function RecipesPage() {
               disabled={saving}
               onClick={save}
             >
-              {saving ? '저장 중...' : '레시피 저장'}
+              {saving
+                ? '저장 중...'
+                : '레시피 저장'}
             </button>
           </>
         }
@@ -498,13 +581,14 @@ export default function RecipesPage() {
         )}
 
         <div className="form-grid two recipe-form">
-
           {/* 생성 방식 */}
           <Field label="생성 방식">
             <select
               value={createMode}
               onChange={(event) =>
-                changeCreateMode(event.target.value)
+                changeCreateMode(
+                  event.target.value,
+                )
               }
             >
               <option value="copy">
@@ -515,15 +599,18 @@ export default function RecipesPage() {
                 빈 레시피로 생성
               </option>
             </select>
-          </Field>
-
+          </Field>          
+          
           {/* 제품 */}
           <Field label="제품">
             <select
               value={form?.productId || ''}
               onChange={(event) => changeProduct(event.target.value)}
             >
-              <option value="" disabled>제품 선택</option>
+              <option value="" disabled>
+                제품 선택
+              </option>
+
               {activeProducts.map((item) => (
                 <option key={item.id} value={item.id}>
                   {item.id} · {item.name}
@@ -538,22 +625,31 @@ export default function RecipesPage() {
               <select
                 value={sourceRecipeId}
                 onChange={(event) =>
-                  changeSourceRecipe(event.target.value)
+                  changeSourceRecipe(
+                    event.target.value,
+                  )
                 }
               >
                 <option value="">
                   복제할 레시피 선택
                 </option>
 
-                {copyCandidates.map((recipe) => (
-                  <option
-                    key={recipe.recipeId}
-                    value={recipe.recipeId}
-                  >
-                    v{recipe.version}
-                    {` (${recipe.status || (recipe.active ? 'ACTIVE' : 'INACTIVE')})`}
-                  </option>
-                ))}
+                {copyCandidates.map(
+                  (recipe) => (
+                    <option
+                      key={recipe.recipeId}
+                      value={recipe.recipeId}
+                    >
+                      v{recipe.version}
+                      {` (${
+                        recipe.status ||
+                        (recipe.active
+                          ? 'ACTIVE'
+                          : 'INACTIVE')
+                      })`}
+                    </option>
+                  ),
+                )}
               </select>
             </Field>
           )}
@@ -567,7 +663,8 @@ export default function RecipesPage() {
               onChange={(event) =>
                 setForm({
                   ...form,
-                  version: event.target.value,
+                  version:
+                    event.target.value,
                 })
               }
             />
@@ -604,7 +701,10 @@ export default function RecipesPage() {
             onClick={() =>
               setForm({
                 ...form,
-                parts: [...form.parts, emptyPart()],
+                parts: [
+                  ...form.parts,
+                  emptyPart(),
+                ],
               })
             }
           >
@@ -614,71 +714,77 @@ export default function RecipesPage() {
         </div>
 
         <div className="recipe-parts-editor">
-          {form?.parts.map((part, index) => (
-            <div
-              className="recipe-part-row"
-              key={index}
-            >
-              <input
-                aria-label="부품 ID"
-                maxLength={50}
-                value={part.partId}
-                onChange={(event) =>
-                  updatePart(
-                    index,
-                    'partId',
-                    event.target.value,
-                  )
-                }
-                placeholder="R1"
-              />
-
-              <input
-                aria-label="예상 클래스"
-                maxLength={100}
-                value={part.expectedClass}
-                onChange={(event) =>
-                  updatePart(
-                    index,
-                    'expectedClass',
-                    event.target.value,
-                  )
-                }
-                placeholder="resistance330"
-              />
-
-              <input
-                aria-label="홀 목록"
-                value={part.holes}
-                onChange={(event) =>
-                  updatePart(
-                    index,
-                    'holes',
-                    event.target.value,
-                  )
-                }
-                placeholder="E9, H9"
-              />
-
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label="부품 삭제"
-                disabled={form.parts.length === 1}
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    parts: form.parts.filter(
-                      (_, partIndex) =>
-                        partIndex !== index,
-                    ),
-                  })
-                }
+          {form?.parts.map(
+            (part, index) => (
+              <div
+                className="recipe-part-row"
+                key={index}
               >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ))}
+                <input
+                  aria-label="부품 ID"
+                  maxLength={50}
+                  value={part.partId}
+                  onChange={(event) =>
+                    updatePart(
+                      index,
+                      'partId',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="R1"
+                />
+
+                <input
+                  aria-label="예상 클래스"
+                  maxLength={100}
+                  value={part.expectedClass}
+                  onChange={(event) =>
+                    updatePart(
+                      index,
+                      'expectedClass',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="resistance330"
+                />
+
+                <input
+                  aria-label="홀 목록"
+                  value={part.holes}
+                  onChange={(event) =>
+                    updatePart(
+                      index,
+                      'holes',
+                      event.target.value,
+                    )
+                  }
+                  placeholder="E9, H9"
+                />
+
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label="부품 삭제"
+                  disabled={
+                    form.parts.length === 1
+                  }
+                  onClick={() =>
+                    setForm({
+                      ...form,
+                      parts:
+                        form.parts.filter(
+                          (_, partIndex) =>
+                            partIndex !==
+                            index,
+                        ),
+                    })
+                  }
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            ),
+          )}
         </div>
       </Modal>
     </>

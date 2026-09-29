@@ -78,7 +78,7 @@ export default function InspectionsPage() {
       <div className="summary-legend"><span><i className="green" /> PASS {rows.filter((row) => row.result === 'PASS').length}</span><span><i className="red" /> FAIL {rows.filter((row) => row.result === 'FAIL').length}</span></div>
     </div>
     <div className="panel table-panel">
-      {loading ? <LoadingState /> : <DataTable columns={columns} rows={rows} onRowClick={(row) => navigate(`/inspections/${row.inspectionId}`)} />}
+      {loading ? <LoadingState /> : <DataTable columns={columns} rows={rows} emptyText={items.length ? '검색 조건에 맞는 검사 기록이 없습니다.' : '아직 저장된 검사 기록이 없습니다.'} onRowClick={(row) => navigate(`/inspections/${row.inspectionId}`)} />}
     </div>
   </>;
 }
