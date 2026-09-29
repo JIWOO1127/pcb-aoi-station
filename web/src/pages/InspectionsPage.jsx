@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { inspectionService } from '../services/api';
 import { DataTable, Field, LoadingState, PageHeader, SearchFilter, StatusBadge } from '../components/UI';
@@ -14,12 +14,32 @@ export default function InspectionsPage() {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    inspectionService.list()
-      .then(setItems)
-      .catch((reason) => setError(reason.message))
-      .finally(() => setLoading(false));
+  const load = useCallback(async (initial = false) => {
+    if (initial) setLoading(true);
+    try {
+      setItems(await inspectionService.list());
+      setError('');
+    } catch (reason) {
+      setError(reason.message);
+    } finally {
+      if (initial) setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    load(true);
+    const timer = window.setInterval(() => load(), 5000);
+    const refreshWhenVisible = () => { if (!document.hidden) load(); };
+    const refreshOnFocus = () => load();
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', refreshOnFocus);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', refreshOnFocus);
+    };
+  }, [load]);
 
   const rows = useMemo(() => items
     .map((item) => ({

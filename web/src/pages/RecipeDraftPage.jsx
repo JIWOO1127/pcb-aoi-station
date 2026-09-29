@@ -35,52 +35,104 @@ function currentErrors(parts) {
   return errors;
 }
 
-function BoardPreview({ draft, parts, previewUrl, mode }) {
+function BoardPreview({ draft, parts, mode }) {
   const overlay = draft.overlay || {};
   const width = overlay.width || 640;
   const height = overlay.height || 640;
-  const holeMap = new Map((overlay.holes || []).map((hole) => [hole.label, hole]));
-  const imageUrl = overlay.image ? `data:image/jpeg;base64,${overlay.image}` : previewUrl;
+  const holes = overlay.holes || [];
+  const holeMap = new Map(holes.map((hole) => [hole.label, hole]));
+  const imageUrl = overlay.image
+    ? (overlay.image.startsWith('data:') ? overlay.image : `data:image/jpeg;base64,${overlay.image}`)
+    : '';
 
-  return <div className="draft-board-wrap">
-    <svg className="draft-board" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="레시피 분석 배치도">
-      {mode === 'photo' && imageUrl
-  ? <image
-      href={imageUrl}
-      x="0"
-      y="0"
-      width={width}
-      height={height}
-      preserveAspectRatio="none"
-    />
-  : <rect width={width} height={height} fill="#f7f9fc" />}
-      {mode === 'layout' && (overlay.holes || []).map((hole) => <g key={hole.label}>
-        <circle cx={hole.x} cy={hole.y} r="3.5" fill="#98a5b8" />
-        <text x={hole.x + 5} y={hole.y - 4} fontSize="7" fill="#728096">{hole.label}</text>
-      </g>)}
-      {parts.map((part) => {
-        let box = part.box;
-        if (mode === 'layout') {
-          const points = parseHoles(part.holesText).map((hole) => holeMap.get(hole)).filter(Boolean);
-          if (points.length) {
-            const xs = points.map((p) => p.x); const ys = points.map((p) => p.y);
-            box = { x: Math.min(...xs) - 10, y: Math.min(...ys) - 10,
-              w: Math.max(24, Math.max(...xs) - Math.min(...xs) + 20),
-              h: Math.max(24, Math.max(...ys) - Math.min(...ys) + 20) };
-          }
-        }
-        if (!box) return null;
-        const review = part.needsReview && !part.reviewConfirmed;
-        return <g
-    key={part.key}
-    className={`draft-part class-${part.class} ${review ? 'review' : ''}`}
-  >
-          <rect x={box.x} y={box.y} width={box.w} height={box.h} rx="3" />
-          <text x={box.x + 2} y={Math.max(9, box.y - 4)}>{part.partId}</text>
-        </g>;
-      })}
-    </svg>
-  </div>;
+  const partBox = (part, boxMode) => {
+    if (boxMode === 'photo') return part.box;
+
+    const points = parseHoles(part.holesText)
+      .map((hole) => holeMap.get(hole))
+      .filter(Boolean);
+    if (!points.length) return null;
+
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const minX = Math.min(...xs);
+    const maxX = Math.max(...xs);
+    const minY = Math.min(...ys);
+    const maxY = Math.max(...ys);
+    const padding = 10;
+
+    return {
+      x: minX - padding,
+      y: minY - padding,
+      w: Math.max(24, maxX - minX + padding * 2),
+      h: Math.max(24, maxY - minY + padding * 2),
+    };
+  };
+
+  const renderBoxes = (boxMode) => parts.map((part) => {
+    const box = partBox(part, boxMode);
+    if (!box) return null;
+    const needsReview = part.needsReview;
+
+    return (
+      <g
+        key={part.key}
+        className={`draft-part ${boxMode === 'photo' ? 'draft-photo-part' : `class-${part.class}`} ${needsReview ? 'review' : ''}`}
+      >
+        <rect
+          x={box.x}
+          y={box.y}
+          width={box.w}
+          height={box.h}
+          rx="3"
+        />
+        <text x={box.x + 3} y={Math.max(11, box.y - 4)}>{part.partId}</text>
+      </g>
+    );
+  });
+
+  if (mode === 'photo') {
+    if (!imageUrl) {
+      return <div className="draft-board-missing">분석된 보드 사진이 응답에 없습니다.</div>;
+    }
+
+    return (
+      <div className="draft-board-wrap">
+        <div className="draft-photo-overlay" style={{ aspectRatio: `${width} / ${height}` }}>
+          <img src={imageUrl} alt="분석된 기준 보드" />
+          <svg
+            viewBox={`0 0 ${width} ${height}`}
+            preserveAspectRatio="none"
+            role="img"
+            aria-label="부품 검출 박스"
+          >
+            {renderBoxes('photo')}
+          </svg>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="draft-board-wrap">
+      <svg
+        className="draft-board"
+        viewBox={`0 0 ${width} ${height}`}
+        preserveAspectRatio="xMidYMid meet"
+        role="img"
+        aria-label="레시피 분석 배치도"
+      >
+        <rect x="0" y="0" width={width} height={height} fill="#f7f9fc" />
+        {holes.map((hole) => (
+          <g key={hole.label}>
+            <circle cx={hole.x} cy={hole.y} r="3.5" fill="#98a5b8" />
+            <text x={hole.x + 5} y={hole.y - 4} fontSize="7" fill="#728096">{hole.label}</text>
+          </g>
+        ))}
+        {renderBoxes('layout')}
+      </svg>
+    </div>
+  );
 }
 
 export default function RecipeDraftPage() {
@@ -199,7 +251,9 @@ export default function RecipeDraftPage() {
       {(draft.warnings || []).map((warning) => <div className="draft-warning" key={warning}>{warning}</div>)}
       {parts.some((part) => part.class?.startsWith('resistance')) && <div className="draft-warning">저항은 조명에 따라 class가 오인식될 수 있습니다. 색상띠와 class를 직접 확인해 주세요.</div>}
       <div className="draft-review-grid">
-        <section className="panel draft-preview-panel"><BoardPreview draft={draft} parts={parts} previewUrl={previewUrl} mode={mode} /><div className="draft-legend"><span><i />확인 완료</span><span><i className="red" />검토 필요</span></div></section>
+        <section className="panel draft-preview-panel"><BoardPreview draft={draft} parts={parts} mode={mode} /><div className="draft-legend">
+          {/* <span><i />확인 완료</span><span><i className="red" />검토 필요</span> */}
+          </div></section>
         <section className="panel draft-parts-panel">
   <div className="draft-parts-title">
     <div>
@@ -360,6 +414,7 @@ export default function RecipeDraftPage() {
 </section>
       </div>
       <div className="draft-actions"><button className="btn btn-ghost" disabled={busy} onClick={() => { setStep('upload'); setDraft(null); setSaved(null); }}><RotateCcw size={15} /> 다시 촬영</button><span />
+        {user?.role !== 'ADMIN' && <small>초안 저장 후 관리자가 승인하면 활성 레시피로 적용됩니다.</small>}
         <button className="btn btn-ghost" disabled={busy || !!saved} onClick={async () => { const result = await saveDraft(); if (result) navigate(`/recipes/${result.recipeId}`); }}><Save size={15} /> 초안 저장</button>
         {user?.role === 'ADMIN' && <button className="btn btn-primary" disabled={busy || !canApprove} onClick={approve}><Check size={15} /> 승인 및 활성화</button>}
       </div>

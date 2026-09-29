@@ -47,7 +47,7 @@ public class RecipeDraftController {
             @JsonProperty("class") String detectedClass, List<String> holes, Double confidence,
             boolean needsReview, List<String> reasons, Box box) {}
     public record Box(Integer x, Integer y, Integer w, Integer h) {}
-    public record Overlay(Integer width, Integer height, List<HolePoint> holes) {}
+    public record Overlay(String image, Integer width, Integer height, List<HolePoint> holes) {}
     public record HolePoint(String label, Double x, Double y) {}
 
     public record DraftSaveRequest(@NotBlank @Size(max = 50) String productId,

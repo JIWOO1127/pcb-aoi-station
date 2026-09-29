@@ -76,7 +76,6 @@ export default function DashboardPage() {
   const [failDetails, setFailDetails] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -116,6 +115,23 @@ export default function DashboardPage() {
 
   useEffect(() => {
     load();
+
+    const timer = window.setInterval(load, 5000);
+
+    const refreshWhenVisible = () => {
+      if (!document.hidden) {
+        load();
+      }
+    };
+
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', load);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', load);
+    };
   }, [load]);
 
   const todayKey = dateKey(now);
@@ -215,7 +231,6 @@ export default function DashboardPage() {
       recipe: `v${item.recipeVersion}`,
       result: item.verdict,
     }));
-
   const columns = [
     {
       key: 'time',

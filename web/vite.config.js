@@ -17,12 +17,10 @@ const serviceConfig = Object.fromEntries(
     }),
 );
 
-const mesApiBaseUrl = `http://${serviceConfig['mes.host']}:${serviceConfig['mes.port']}/api`;
-
 export default defineConfig({
   plugins: [react()],
   define: {
-    __MES_API_BASE_URL__: JSON.stringify(mesApiBaseUrl),
+    __MES_API_PORT__: JSON.stringify(serviceConfig['mes.port']),
   },
   server: {
     host: serviceConfig['web.host'],
