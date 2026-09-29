@@ -249,6 +249,42 @@ erDiagram
 
 ## 8. 실행 방법
 
+### 빠른 실행 (MES 관리자 웹)
+
+필수 프로그램은 **PostgreSQL, Java 17 이상, Node.js**다. 저장소를 받은 뒤 다음 순서로 실행한다.
+
+1. PostgreSQL에 `pcb_aoi` 데이터베이스를 만든다. 테이블과 초기 데이터는 MES 최초 실행 시 Flyway가 자동으로 생성한다.
+
+```powershell
+psql -U postgres -c "CREATE DATABASE pcb_aoi;"
+```
+
+2. 첫 번째 PowerShell에서 MES를 실행한다. `1234` 부분에는 본인 PostgreSQL 비밀번호를 입력한다.
+
+```powershell
+cd mes\pcb_manage
+$env:DB_PASSWORD = "1234"
+.\gradlew.bat bootRun
+```
+
+3. 두 번째 PowerShell에서 관리자 웹을 실행한다. `npm install`은 최초 한 번만 실행하면 된다.
+
+```powershell
+cd web
+npm install
+npm run dev
+```
+
+4. 브라우저에서 접속한다.
+
+- 같은 PC: `http://localhost:5173`
+- 같은 네트워크의 다른 PC: `http://<MES PC IP>:5173`
+- MES API 확인: `http://<MES PC IP>:8080`
+
+포트와 서비스 주소는 루트의 `service-config.properties`에서 관리한다. 다른 PC에서 접속할 때는 `web.public-host`를 MES PC의 실제 IP로 설정하고 MES와 웹을 다시 시작한다. 웹은 브라우저에서 접속한 호스트의 `8080` 포트로 MES API를 호출한다.
+
+사진 기반 레시피 분석까지 사용하려면 Python `/recipe-draft` 서비스가 별도로 실행 중이어야 한다. 해당 서버의 IP와 포트는 `service-config.properties`의 `python.host`, `python.port`에서 설정한다. Python 서비스가 없어도 로그인, 대시보드, 검사 이력 등 일반 MES 기능은 사용할 수 있다.
+
 ### MES 서버
 
 Java 17 이상과 PostgreSQL이 필요하다. 기본 접속 정보는 `mes/pcb_manage/src/main/resources/application.properties`에 있으며 운영 환경에서는 `DB_URL`, `DB_USERNAME`, `DB_PASSWORD`, `JWT_SECRET`을 설정한다.
@@ -267,7 +303,7 @@ cd mes/pcb_manage
 
 ### 관리자 웹
 
-Node.js 설치 후 실행한다. API 주소를 지정하지 않으면 `http://localhost:8080/api`를 사용한다.
+Node.js 설치 후 실행한다. 별도 `VITE_API_BASE_URL`을 지정하지 않으면 현재 웹에 접속한 호스트의 `8080` 포트를 MES API로 사용한다.
 
 ```powershell
 cd web
