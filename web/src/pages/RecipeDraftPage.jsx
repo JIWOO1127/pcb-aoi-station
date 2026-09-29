@@ -414,6 +414,7 @@ export default function RecipeDraftPage() {
 </section>
       </div>
       <div className="draft-actions"><button className="btn btn-ghost" disabled={busy} onClick={() => { setStep('upload'); setDraft(null); setSaved(null); }}><RotateCcw size={15} /> 다시 촬영</button><span />
+        {user?.role !== 'ADMIN' && <small>초안 저장 후 관리자가 승인하면 활성 레시피로 적용됩니다.</small>}
         <button className="btn btn-ghost" disabled={busy || !!saved} onClick={async () => { const result = await saveDraft(); if (result) navigate(`/recipes/${result.recipeId}`); }}><Save size={15} /> 초안 저장</button>
         {user?.role === 'ADMIN' && <button className="btn btn-primary" disabled={busy || !canApprove} onClick={approve}><Check size={15} /> 승인 및 활성화</button>}
       </div>
