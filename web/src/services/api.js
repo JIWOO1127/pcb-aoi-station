@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || __MES_API_BASE_URL__;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+  || `http://${window.location.hostname || 'localhost'}:${__MES_API_PORT__}/api`;
 let unauthorizedHandler = () => {};
 export const setUnauthorizedHandler = (handler) => { unauthorizedHandler = handler; };
 
