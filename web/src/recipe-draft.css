@@ -225,6 +225,62 @@
     width: 100%;
     max-height: 620px
 }
+
+.draft-photo-overlay {
+    position: relative;
+    width: 100%;
+    max-height: 620px;
+    background: #111827;
+}
+
+.draft-photo-overlay img {
+    display: block;
+    width: 100%;
+    height: 100%;
+}
+
+.draft-photo-overlay svg {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+}
+
+.draft-photo-part rect {
+    fill: none;
+    stroke: #22c55e;
+    stroke-width: 2;
+    vector-effect: non-scaling-stroke;
+}
+
+.draft-photo-part text {
+    fill: #22c55e;
+    stroke: #fff;
+    stroke-width: 3px;
+    paint-order: stroke;
+}
+
+.draft-photo-part.review rect {
+    stroke: #f59e0b;
+    stroke-width: 3;
+    stroke-dasharray: none;
+}
+
+.draft-photo-part.review text {
+    fill: #f59e0b;
+}
+
+.draft-board-missing {
+    min-height: 520px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 6px;
+    background: #f7f9fc;
+    color: #7b8799;
+    font-size: 10px;
+}
 .draft-part rect{
   stroke-width:2;
 }
@@ -658,6 +714,31 @@
     gap: 18px;
     color: #169664
 }
+
+/* 전체 웹 스크롤바 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #cbd3df transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: #cbd3df;
+  border-radius: 999px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: #9eabbc;
+}
+
 
 @media(max-width:1000px) {
 
