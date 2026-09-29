@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle2, CircleGauge, ClipboardCheck, Factory, RefreshCw } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, Cell, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -11,8 +11,28 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
-  const load = async () => { try { setData(await dashboardService.getSummary()); setError(''); } catch (reason) { setError(reason.message); } };
-  useEffect(() => { load(); }, []);
+  const load = useCallback(async () => {
+    try {
+      setData(await dashboardService.getSummary());
+      setError('');
+    } catch (reason) {
+      setError(reason.message);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+    const timer = window.setInterval(load, 5000);
+    const refreshWhenVisible = () => { if (!document.hidden) load(); };
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    window.addEventListener('focus', load);
+
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      window.removeEventListener('focus', load);
+    };
+  }, [load]);
   const today = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' });
   const columns = [
     { key: 'time', label: '검사 시간' }, { key: 'product', label: '제품' }, { key: 'station', label: 'Station' },
