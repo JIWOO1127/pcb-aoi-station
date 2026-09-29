@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Camera, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
-import { recipeService } from '../services/api';
+import { productService, recipeService } from '../services/api';
 import {
   DataTable,
   Field,
@@ -24,6 +24,7 @@ const emptyPart = () => ({
 
 export default function RecipesPage() {
   const [items, setItems] = useState([]);
+  const [productItems, setProductItems] = useState([]);
   const [product, setProduct] = useState('');
   const [status, setStatus] = useState('');
   const [loading, setLoading] = useState(true);
@@ -50,7 +51,12 @@ export default function RecipesPage() {
     setError('');
 
     try {
-      setItems(await recipeService.list());
+      const [recipeItems, products] = await Promise.all([
+        recipeService.list(),
+        productService.list(),
+      ]);
+      setItems(recipeItems);
+      setProductItems(products);
     } catch (reason) {
       setError(reason.message);
     } finally {
@@ -80,6 +86,7 @@ export default function RecipesPage() {
   );
 
   const products = [...new Set(items.map((item) => item.productId))];
+  const activeProducts = productItems.filter((item) => item.status === 'ACTIVE');
 
   const columns = [
     {
@@ -175,7 +182,8 @@ export default function RecipesPage() {
 
   // 새 레시피 버튼
   const openCreate = async () => {
-    const productId = product || products[0] || '';
+    const selectedProductIsActive = activeProducts.some((item) => item.id === product);
+    const productId = selectedProductIsActive ? product : activeProducts[0]?.id || '';
     const source = getDefaultSource(productId);
 
     setError('');
@@ -510,18 +518,18 @@ export default function RecipesPage() {
           </Field>
 
           {/* 제품 */}
-          <Field label="제품 ID">
-            <input
-              maxLength={50}
+          <Field label="제품">
+            <select
               value={form?.productId || ''}
-              onChange={(event) =>
-                setForm({
-                  ...form,
-                  productId: event.target.value,
-                })
-              }
-              placeholder="NE555-B"
-            />
+              onChange={(event) => changeProduct(event.target.value)}
+            >
+              <option value="" disabled>제품 선택</option>
+              {activeProducts.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.id} · {item.name}
+                </option>
+              ))}
+            </select>
           </Field>
 
           {/* 복제할 기존 Recipe */}
