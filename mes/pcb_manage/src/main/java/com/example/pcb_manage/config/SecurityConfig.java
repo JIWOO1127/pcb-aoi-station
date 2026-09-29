@@ -53,10 +53,14 @@ public class SecurityConfig {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${web.host:localhost}") String webHost,
+            @Value("${web.public-host:localhost}") String webPublicHost,
             @Value("${web.port:5173}") int webPort) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(java.util.List.of("http://" + webHost + ":" + webPort));
+        configuration.setAllowedOrigins(java.util.List.of(
+                "http://localhost:" + webPort,
+                "http://127.0.0.1:" + webPort,
+                "http://" + webPublicHost + ":" + webPort
+        ));
         configuration.setAllowedMethods(java.util.List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(java.util.List.of("Authorization", "Content-Type", "X-Station-Key"));
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
