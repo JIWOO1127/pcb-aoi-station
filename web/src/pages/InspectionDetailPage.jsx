@@ -28,7 +28,7 @@ export default function InspectionDetailPage() {
   return <>
     <button className="back-button" onClick={() => navigate('/inspections')}><ArrowLeft size={16} /> 검사 기록</button>
     {error && <div className="info-banner"><b>검사 기록 조회 실패</b><span>{error}</span></div>}
-    {!item ? <LoadingState /> : <>
+    {!item && !error ? <LoadingState /> : item ? <>
       <PageHeader eyebrow="INSPECTION DETAIL" title={item.inspectionId} description="스테이션에서 전송한 구조화된 검사 결과입니다." action={<StatusBadge value={item.verdict} />} />
       <div className="inspection-layout">
         <Panel title="검사 정보" subtitle="판정 및 실행 환경">
@@ -53,6 +53,6 @@ export default function InspectionDetailPage() {
       <Panel title="부품별 검사 결과" subtitle={`총 ${item.parts.length}개 부품`}>
         <DataTable columns={columns} rows={item.parts.map((part) => ({ ...part, id: part.partId }))} pageSize={20} />
       </Panel>
-    </>}
+    </> : null}
   </>;
 }

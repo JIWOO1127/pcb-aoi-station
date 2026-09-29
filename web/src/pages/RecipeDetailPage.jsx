@@ -44,7 +44,7 @@ export default function RecipeDetailPage() {
   return <>
     <button className="back-button" onClick={() => navigate('/recipes')}><ArrowLeft size={16} /> 레시피 목록</button>
     {error && <div className="info-banner"><b>레시피 조회 실패</b><span>{error}</span></div>}
-    {!recipe ? <LoadingState /> : <>
+    {!recipe && !error ? <LoadingState /> : recipe ? <>
       <PageHeader
         eyebrow={`${recipe.productId} / RECIPE`}
         title={`${recipe.productId} v${recipe.version}`}
@@ -78,6 +78,7 @@ export default function RecipeDetailPage() {
       <Panel title="부품 검사 기준" subtitle="부품별 예상 클래스와 핀홀">
         <DataTable columns={columns} rows={recipe.parts.map((part) => ({ ...part, id: part.partId }))} pageSize={20} />
       </Panel>
+      
       <ConfirmModal
         open={confirmApproval}
         title="레시피 승인 및 활성화"
@@ -86,6 +87,9 @@ export default function RecipeDetailPage() {
         onConfirm={approve}
         confirmText={approving ? '승인 중...' : '승인 및 활성화'}
       />
-    </>}
+    </> : null}
+      
+      
+      
   </>;
 }
