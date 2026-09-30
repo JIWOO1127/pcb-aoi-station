@@ -1,0 +1,373 @@
+{
+ "note": "test1.jpg /infer baseline from unmodified code (default orientation, no dev_orientation_fix)",
+ "commit": "8fbd255",
+ "imageSha256": "4f17e16100dae1f216363b8340f97ed3f70948daee8e6164b221b619639f9666",
+ "infer": {
+  "parts": [
+   {
+    "pinhole": "D2",
+    "class": "led",
+    "confidence": 0.959103524684906
+   },
+   {
+    "pinhole": "D3",
+    "class": "led",
+    "confidence": 0.959103524684906
+   },
+   {
+    "pinhole": "D9",
+    "class": "black_wire",
+    "confidence": 0.949621319770813
+   },
+   {
+    "pinhole": "D13",
+    "class": "black_wire",
+    "confidence": 0.949621319770813
+   },
+   {
+    "pinhole": "E9",
+    "class": "resistance330",
+    "confidence": 0.8012288212776184
+   },
+   {
+    "pinhole": "H6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "H7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "H9",
+    "class": "resistance330",
+    "confidence": 0.8012288212776184
+   },
+   {
+    "pinhole": "H11",
+    "class": "black_wire",
+    "confidence": 0.9776347875595093
+   },
+   {
+    "pinhole": "I6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "I7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "J0",
+    "class": "black_wire",
+    "confidence": 0.8543010354042053
+   },
+   {
+    "pinhole": "J2",
+    "class": "black_wire",
+    "confidence": 0.8543010354042053
+   },
+   {
+    "pinhole": "J6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "J7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "K6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "K7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "L6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "L7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "L11",
+    "class": "black_wire",
+    "confidence": 0.9776347875595093
+   },
+   {
+    "pinhole": "M4",
+    "class": "white_wire",
+    "confidence": 0.9220893979072571
+   },
+   {
+    "pinhole": "M6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "M7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "N0",
+    "class": "red_wire",
+    "confidence": 0.8682747483253479
+   },
+   {
+    "pinhole": "N2",
+    "class": "red_wire",
+    "confidence": 0.8682747483253479
+   },
+   {
+    "pinhole": "N3",
+    "class": "resistance330",
+    "confidence": 0.9415521025657654
+   },
+   {
+    "pinhole": "N6",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "N7",
+    "class": "ic_chip",
+    "confidence": 0.979764997959137
+   },
+   {
+    "pinhole": "N8",
+    "class": "resistance330",
+    "confidence": 0.5598856210708618
+   },
+   {
+    "pinhole": "Q3",
+    "class": "resistance330",
+    "confidence": 0.9415521025657654
+   },
+   {
+    "pinhole": "Q4",
+    "class": "white_wire",
+    "confidence": 0.9220893979072571
+   },
+   {
+    "pinhole": "Q8",
+    "class": "resistance330",
+    "confidence": 0.5598856210708618
+   },
+   {
+    "pinhole": "Q9",
+    "class": "capacitor",
+    "confidence": 0.9875690340995789
+   },
+   {
+    "pinhole": "Q10",
+    "class": "capacitor",
+    "confidence": 0.9875690340995789
+   },
+   {
+    "pinhole": "R12",
+    "class": "black_wire",
+    "confidence": 0.9360399842262268
+   },
+   {
+    "pinhole": "R13",
+    "class": "black_wire",
+    "confidence": 0.9360399842262268
+   }
+  ]
+ },
+ "inferSha256": "0b2cee5fd2e52eb487370fd4190426851df073855b89e111a3d76a7c96fb4669",
+ "inferOverlaySha256": "0104b0a018ce033cfd59c29cb48222cb43baafc16ad12e94b501472a80faeaa9",
+ "inferOverlayParts": [
+  {
+   "pinhole": "D2",
+   "class": "led",
+   "confidence": 0.959103524684906
+  },
+  {
+   "pinhole": "D3",
+   "class": "led",
+   "confidence": 0.959103524684906
+  },
+  {
+   "pinhole": "D9",
+   "class": "black_wire",
+   "confidence": 0.949621319770813
+  },
+  {
+   "pinhole": "D13",
+   "class": "black_wire",
+   "confidence": 0.949621319770813
+  },
+  {
+   "pinhole": "E9",
+   "class": "resistance330",
+   "confidence": 0.8012288212776184
+  },
+  {
+   "pinhole": "H6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "H7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "H9",
+   "class": "resistance330",
+   "confidence": 0.8012288212776184
+  },
+  {
+   "pinhole": "H11",
+   "class": "black_wire",
+   "confidence": 0.9776347875595093
+  },
+  {
+   "pinhole": "I6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "I7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "J0",
+   "class": "black_wire",
+   "confidence": 0.8543010354042053
+  },
+  {
+   "pinhole": "J2",
+   "class": "black_wire",
+   "confidence": 0.8543010354042053
+  },
+  {
+   "pinhole": "J6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "J7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "K6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "K7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "L6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "L7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "L11",
+   "class": "black_wire",
+   "confidence": 0.9776347875595093
+  },
+  {
+   "pinhole": "M4",
+   "class": "white_wire",
+   "confidence": 0.9220893979072571
+  },
+  {
+   "pinhole": "M6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "M7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "N0",
+   "class": "red_wire",
+   "confidence": 0.8682747483253479
+  },
+  {
+   "pinhole": "N2",
+   "class": "red_wire",
+   "confidence": 0.8682747483253479
+  },
+  {
+   "pinhole": "N3",
+   "class": "resistance330",
+   "confidence": 0.9415521025657654
+  },
+  {
+   "pinhole": "N6",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "N7",
+   "class": "ic_chip",
+   "confidence": 0.979764997959137
+  },
+  {
+   "pinhole": "N8",
+   "class": "resistance330",
+   "confidence": 0.5598856210708618
+  },
+  {
+   "pinhole": "Q3",
+   "class": "resistance330",
+   "confidence": 0.9415521025657654
+  },
+  {
+   "pinhole": "Q4",
+   "class": "white_wire",
+   "confidence": 0.9220893979072571
+  },
+  {
+   "pinhole": "Q8",
+   "class": "resistance330",
+   "confidence": 0.5598856210708618
+  },
+  {
+   "pinhole": "Q9",
+   "class": "capacitor",
+   "confidence": 0.9875690340995789
+  },
+  {
+   "pinhole": "Q10",
+   "class": "capacitor",
+   "confidence": 0.9875690340995789
+  },
+  {
+   "pinhole": "R12",
+   "class": "black_wire",
+   "confidence": 0.9360399842262268
+  },
+  {
+   "pinhole": "R13",
+   "class": "black_wire",
+   "confidence": 0.9360399842262268
+  }
+ ]
+}

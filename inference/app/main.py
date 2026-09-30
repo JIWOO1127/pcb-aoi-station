@@ -15,11 +15,13 @@ from typing import List
 
 import cv2
 import numpy as np
-from fastapi import FastAPI, File, HTTPException, Query, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Query, UploadFile
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 from ultralytics import YOLO
 
-from board import DetectedBox, all_holes_from_image, match_holes_to_boxes
+import recipe_draft
+from board import DetectedBox, all_holes_from_image, match_holes_to_boxes, match_holes_to_boxes_grouped
 from roi import crop_to_roi
 
 app = FastAPI(title="PCB AOI 추론 서비스")
@@ -160,6 +162,63 @@ async def infer_debug(image: UploadFile = File(...)) -> InferDebugResponse:
     return InferDebugResponse(
         pinholes=[DebugPinhole(pinhole=h.label, x=h.pixel[0], y=h.pixel[1]) for h in holes]
     )
+
+
+def _error(status: int, code: str, message: str) -> JSONResponse:
+    return JSONResponse(status_code=status, content={"code": code, "message": message})
+
+
+@app.post("/recipe-draft")
+async def recipe_draft_endpoint(
+    image: UploadFile | None = File(None),
+    productId: str | None = Form(None),  # noqa: N803 (합의한 필드 이름 그대로)
+):
+    """기준(정상) 보드 사진 → 레시피 초안.
+
+    /infer와 같은 경로(crop_to_roi → 방향 판단 → 홀 계산 → YOLO·중복 제거 → 다리 배정)를 그대로 쓴다.
+    검사와 초안이 같은 방향 판단을 해야 홀 이름이 어긋나지 않는다 (dev_server로 띄우면 그 패치도 똑같이 적용됨).
+    응답 형식은 MES 담당과 합의한 명세: productId, parts[{partId, class, holes, confidence, needsReview, reasons, box}],
+    overlay{image, width, height, holes[{label,x,y}]}, warnings. box·holes 좌표는 overlay.image 기준 px.
+
+    오류: 400 BAD_REQUEST(필드 없음·이미지를 읽을 수 없음), 422 BOARD_NOT_RECOGNIZED(보드·홀을 못 찾음),
+          500 INTERNAL_ERROR. 본문은 {code, message}.
+    """
+    if image is None or productId is None or not productId.strip():
+        return _error(400, "BAD_REQUEST", "image와 productId가 모두 필요합니다.")
+
+    try:
+        image_bytes = await image.read()
+        decoded = cv2.imdecode(np.frombuffer(image_bytes, dtype=np.uint8), cv2.IMREAD_COLOR) if image_bytes else None
+        if decoded is None:
+            return _error(400, "BAD_REQUEST", "image를 이미지로 읽을 수 없습니다.")
+
+        try:
+            roi_image, img_scale, label_anchors = crop_to_roi(decoded)
+            _, holes = all_holes_from_image(roi_image, img_scale, label_anchors)
+        except ValueError as e:
+            return _error(422, "BOARD_NOT_RECOGNIZED", f"보드 또는 구멍을 찾지 못했습니다: {e}")
+
+        boxes = detect_parts(roi_image)
+        groups = match_holes_to_boxes_grouped(holes, boxes)
+        draft = recipe_draft.build_draft(groups)
+
+        ok, jpeg = cv2.imencode(".jpg", roi_image, [cv2.IMWRITE_JPEG_QUALITY, 90])
+        if not ok:
+            return _error(500, "INTERNAL_ERROR", "정렬된 사진을 JPEG로 인코딩하지 못했습니다.")
+
+        return {
+            "productId": productId.strip(),
+            "parts": [p.to_json() for p in draft.parts],
+            "overlay": {
+                "image": base64.b64encode(jpeg.tobytes()).decode("ascii"),
+                "width": int(roi_image.shape[1]),
+                "height": int(roi_image.shape[0]),
+                "holes": recipe_draft.overlay_holes(holes),
+            },
+            "warnings": draft.warnings,
+        }
+    except Exception as e:  # noqa: BLE001 — 합의한 오류 형식({code, message})으로 돌려준다
+        return _error(500, "INTERNAL_ERROR", f"{type(e).__name__}: {e}")
 
 
 def run_inference(image_bytes: bytes) -> List[PartResult]:
