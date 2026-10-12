@@ -92,10 +92,22 @@ def all_holes_from_image(
 # LED·커패시터는 둥근 몸통이 여러 핀홀 위에 걸쳐 보이지만(박스 안에 핀홀
 # 후보가 여러 개 잡힘), 실제 다리는 2개뿐이고 몸통 중심 바로 아래로 나온다.
 # 그래서 박스 안 후보 중 "박스 중심에 가장 가까운 2개"를 진짜 다리로 본다.
-# wire·resistance·ic_chip은 다리 위치 판별 로직이 아직 없어서 기존처럼 박스 안
-# 홀을 전부 장착으로 표시한다 (다음 단계에서 클래스별로 추가 예정).
-_ROUND_PART_CLASSES = {"led", "capacitor"}
-_ROUND_PART_LEG_COUNT = 2
+_LEG_COUNT_BY_NEAREST_CENTER = {
+    "led": 2,
+    "capacitor": 2,
+}
+
+# IC칩은 다리가 정확히 14개인데, 몸통 양옆(가장 바깥쪽 두 열)에만 있다 —
+# 중간 열은 몸통에 가려져 보일 뿐 실제 다리가 없다. 그래서 후보를 바깥쪽
+# 두 열로 먼저 좁힌 다음, 그중 박스 중심에서 가장 가까운 14개만 다리로 본다.
+_IC_CHIP_CLASS = "ic_chip"
+_IC_CHIP_LEG_COUNT = 14
+
+# 전선·저항은 길쭉한 몸통 양 끝에만 다리가 있다(중심 근처엔 다리가 없음).
+# 그래서 박스의 긴 축(가로/세로 중 더 긴 쪽) 방향으로 정렬해서 양 끝 2개만
+# 다리로 본다.
+_ELONGATED_PART_CLASSES = {"black_wire", "red_wire", "white_wire", "resistance330", "resistance470"}
+_ELONGATED_PART_LEG_COUNT = 2
 
 
 def match_holes_to_boxes(holes: list[Hole], boxes: list[DetectedBox]) -> None:
@@ -108,10 +120,22 @@ def match_holes_to_boxes(holes: list[Hole], boxes: list[DetectedBox]) -> None:
         if not contained:
             continue
 
-        if box.part_class in _ROUND_PART_CLASSES:
+        if box.part_class == _IC_CHIP_CLASS:
+            min_col = min(hole.col for hole in contained)
+            max_col = max(hole.col for hole in contained)
+            contained = [hole for hole in contained if hole.col in (min_col, max_col)]
             cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
             contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
-            contained = contained[:_ROUND_PART_LEG_COUNT]
+            contained = contained[:_IC_CHIP_LEG_COUNT]
+        elif box.part_class in _LEG_COUNT_BY_NEAREST_CENTER:
+            cx, cy = (box.x1 + box.x2) / 2, (box.y1 + box.y2) / 2
+            contained.sort(key=lambda hole: (hole.pixel[0] - cx) ** 2 + (hole.pixel[1] - cy) ** 2)
+            contained = contained[:_LEG_COUNT_BY_NEAREST_CENTER[box.part_class]]
+        elif box.part_class in _ELONGATED_PART_CLASSES and len(contained) > _ELONGATED_PART_LEG_COUNT:
+            horizontal = (box.x2 - box.x1) >= (box.y2 - box.y1)
+            axis_key = (lambda hole: hole.pixel[0]) if horizontal else (lambda hole: hole.pixel[1])
+            contained.sort(key=axis_key)
+            contained = [contained[0], contained[-1]]
 
         for hole in contained:
             hole.part_class = box.part_class

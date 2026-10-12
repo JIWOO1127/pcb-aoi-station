@@ -34,5 +34,15 @@
 
 ### 다음 할 일
 
-- 추론 서비스 TODO 채워지면, 실제 `200` 응답으로 왕복 테스트 다시 해보기
+- ~~추론 서비스 TODO 채워지면, 실제 `200` 응답으로 왕복 테스트 다시 해보기~~ → **완료**, 아래 "왕복 연동 테스트 재확인" 참고
 - 이 테스트용 엔드포인트(`/api/inference-test`)를 실제 검사 흐름(`POST /api/trigger`)에 연결 — 지금은 별도 테스트용으로만 존재
+
+## 2026-09-28 — 왕복 연동 테스트 재확인 (추론 서비스 TODO 완료 후)
+
+- 추론 서비스 쪽 `roi.ROI`, `find_board_corners`, `detect_parts`(YOLO)가 모두 채워진 뒤 처음으로 다시 왕복 테스트 진행
+- 추론 서비스(`uvicorn main:app --port 8001`) + 스테이션(`dotnet run --urls http://localhost:5215`) 둘 다 새로 기동
+  - **주의**: 포트 8001에 9월 23일부터 떠 있던 이전 세션의 uvicorn 프로세스가 이미 떠 있어서(오래된 코드로 응답), 새로 띄운 프로세스가 바인딩에 실패하고 조용히 무시되는 문제가 있었음 → `netstat -ano`로 점유 PID 확인 후 종료(`taskkill /F /PID`)하고 재기동해서 해결. 다음에도 "분명 코드 고쳤는데 반영 안 됨/500"이면 해당 포트에 오래된 프로세스가 남아있는지부터 의심할 것
+- `curl -X POST http://localhost:5215/api/inference-test -F "image=@...jpg;type=image/jpeg"`로 확인:
+  - `new_test_images/board4.jpg`, `test_images/board1.jpg`, `new_test_images/board2.jpg` 세 장 모두 `200` 응답, `station`이 추론 서비스의 `parts` 배열을 그대로 전달하는 것 확인 (예: board4 → `ic_chip`/`led`/`resistance330`/`resistance470`/`black_wire`/`white_wire`/`red_wire`/`capacitor` 핀홀별 결과)
+  - `/infer`를 추론 서비스에 직접 호출한 결과와 `/api/inference-test`를 통해 받은 결과가 동일함도 확인 — 스테이션 쪽 프록시 로직에 변형이 없음
+- **왕복 테스트 자체는 끝남.** 다음 남은 일은 위 "다음 할 일"의 두 번째 항목(`/api/inference-test`를 실제 `POST /api/trigger` 흐름에 연결)뿐
