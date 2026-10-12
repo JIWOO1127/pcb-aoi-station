@@ -33,6 +33,72 @@
 - 운영 환경에서는 MES와 스테이션에 동일한 `JWT_SECRET`(32바이트 이상)을 안전하게 설정한다.
 - 계정이 비활성화되거나 Role이 변경되면 기존 JWT도 다음 요청부터 사용할 수 없다.
 
+station/recipe-sync
+## HMI → 스테이션 : `POST /api/login` (레시피 동기화 포함)
+
+HMI의 작업자 로그인. 스테이션이 MES `POST /api/auth/login`에 물어보고, 성공하면 받은 JWT로 곧바로 MES의 승인(활성) 레시피를 맞춰 본다.
+JWT는 스테이션 안에서 레시피 조회에만 쓰고 HMI로 보내지 않는다.
+
+### 요청
+
+```json
+{ "employeeId": "E-0001", "pin": "…" }
+```
+
+### 성공 응답 (`200 OK`)
+
+```json
+{
+  "employeeId": "E-0001",
+  "name": "작업자",
+  "role": "ENGINEER",
+  "offline": false,
+  "recipeSync": [
+    { "productId": "NE555-A", "status": "NOT_FOUND", "version": 4, "recipeId": null,
+      "approvedBy": null, "approvedAt": null },
+    { "productId": "NE555-B", "status": "UPDATED", "version": 4,
+      "recipeId": "7bafaa9d-4d9f-4d2e-bc04-0db47d401003",
+      "approvedBy": "E-0002", "approvedAt": "2026-09-28T09:10:00Z" }
+  ]
+}
+```
+
+### 오류 응답
+
+| 코드 | 본문 | 뜻 |
+|---|---|---|
+| `400` | `{ message }` | 사번 또는 PIN이 비었음 |
+| `401` | `{ message }` | 사번 또는 PIN이 틀림 |
+| `503` | `{ code: "MES_UNAVAILABLE", message, recipeSync }` | MES에 연결할 수 없음. `recipeSync`는 모든 제품 `OFFLINE` + 지금 쓰는 레시피. HMI는 저장해 둔 정보로 오프라인 로그인을 시도한다 |
+
+### `recipeSync`
+
+스테이션에 원본 레시피 파일(`Recipes/{productId}.json`)이 있는 제품마다 한 줄. `Mes:RecipeSyncEnabled=false`이면 빈 목록.
+
+| 필드 | 타입 | 설명 |
+|---|---|---|
+| `productId` | string | 제품 ID |
+| `status` | string | 아래 표 |
+| `version` | int \| null | 이 결과 뒤 **판정에 쓰는** 레시피 버전 (`UPDATED`면 새 버전, 아니면 지금 쓰는 버전) |
+| `recipeId` | UUID \| null | MES 레시피 ID. 원본 파일을 쓰는 중이면 `null` |
+| `approvedBy` | string \| null | MES의 승인자 사번. 모르면 `null` |
+| `approvedAt` | ISO-8601 \| null | 승인 시각. 모르면 `null` |
+
+| `status` | 조건 | 스테이션 동작 | HMI |
+|---|---|---|---|
+| `UPDATED` | MES 활성 버전 > 지금 쓰는 버전 | `recipes-cache/{productId}.json`에 저장, 이번 검사부터 적용 | 파란 배너 5초 |
+| `UNCHANGED` | MES 활성 버전 ≤ 지금 쓰는 버전 | 그대로 | 없음 |
+| `OFFLINE` | MES 오류·시간 초과(3초)·오프라인 로그인 | 지금 레시피 유지 | 노란 배너 5초 |
+| `NOT_FOUND` | MES에 그 제품의 활성 레시피가 없음 | 지금 레시피 유지 | 없음 |
+| `INVALID` | 받은 레시피가 비었거나 형식이 깨짐 (부품 없음, 모르는 클래스, 없는 홀 등) | 저장하지 않고 유지, 로그 | 없음 |
+
+- 동기화 실패는 로그인 실패가 아니다. 어떤 경우에도 로그인 결과(200/401/503)는 MES 로그인만으로 정해진다.
+- 판정 레시피: `recipes-cache/{productId}.json`이 있으면 그것, 없으면 원본. 원본 파일은 스테이션이 절대 쓰지 않는다.
+- 검사 기록(`POST /api/inspections`)의 `recipeId`: 판정에 캐시 레시피를 썼으면 그 ID, 원본이면 `null`(MES가 활성 레시피로 대체).
+- 스테이션이 부르는 MES API: `GET /api/recipes`(목록, `active`·`version`), `GET /api/recipes/{recipeId}`(상세, `parts[{partId, expectedClass, holes}]`, `approvedBy`, `approvedAt`). 작업자 JWT 사용.
+
+=======
+main
 ## 관리자 웹 → MES : 사용자 관리
 
 모든 사용자 관리 API는 `ADMIN` JWT가 필요하다.
@@ -86,6 +152,8 @@
 - 저장된 새 버전이 활성화되고 해당 제품의 기존 활성 버전은 비활성화된다.
 - 생성 이력은 `RECIPE_CREATE` 감사 로그로 남는다.
 
+station/recipe-sync
+=======
 ### 사진 기반 레시피 초안
 
 React는 Python을 직접 호출하지 않고 MES에만 요청한다. 사진은 분석 응답을 전달한 뒤 폐기하며 DB에 저장하지 않는다.
@@ -105,6 +173,7 @@ React는 Python을 직접 호출하지 않고 MES에만 요청한다. 사진은 
 - 생성과 승인은 `RECIPE_DRAFT_CREATE`, `RECIPE_APPROVE` 감사 로그로 기록한다.
 - MES·웹·Python 주소와 포트는 루트의 `service-config.properties`에서 관리한다. 환경 변수 `RECIPE_DRAFT_URL`로 Python 주소를 덮어쓸 수 있으며, 로컬 개발에서는 `RECIPE_DRAFT_SAMPLE_FALLBACK=true`일 때 연결 실패를 샘플 응답으로 대체할 수 있다.
 
+main
 ## 스테이션 → 추론 서비스 : `POST /infer`
 
 ### 요청

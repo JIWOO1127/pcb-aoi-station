@@ -122,6 +122,37 @@ public class InspectionRulesTests
     }
 
     [Fact]
+    public void 다리_한칸_이동은_위치불량_하나로_흡수된다()
+    {
+        // 다리 기준 레시피: 전선 양 끝 H11, M11. 아래 다리가 한 칸 위 L11에 꽂힘 (test1의 W4)
+        var recipe = new List<RecipePart> { Recipe("W4", "black_wire", "H11", "M11") };
+        var detections = Cover("black_wire", "H11", "L11").ToList();
+
+        var result = InspectionRules.Judge(recipe, detections);
+
+        var w4 = Part(result, "W4");
+        Assert.Equal(DefectType.Offset, w4.Defect);
+        Assert.Contains(H("L11"), w4.CoveredHoles);   // 빗나간 다리가 이 부품 쪽으로
+        Assert.Single(result, p => p.Defect is not null);
+        Assert.DoesNotContain(result, p => p.Defect == DefectType.Extra);
+    }
+
+    [Fact]
+    public void 두칸_이상_떨어진_홀은_흡수하지_않는다()
+    {
+        // K11은 빈 홀 M11에서 두 칸 → 빗나간 다리로 보지 않는다 (위치 1건 + 추가 1건)
+        var recipe = new List<RecipePart> { Recipe("W4", "black_wire", "H11", "M11") };
+        var detections = Cover("black_wire", "H11", "K11").ToList();
+
+        var result = InspectionRules.Judge(recipe, detections);
+
+        Assert.Equal(DefectType.Offset, Part(result, "W4").Defect);
+        Assert.DoesNotContain(H("K11"), Part(result, "W4").CoveredHoles);
+        var extra = Assert.Single(result, p => p.Defect == DefectType.Extra);
+        Assert.Equal(new[] { H("K11") }, extra.CoveredHoles);
+    }
+
+    [Fact]
     public void 홀라벨_파싱과_유효성()
     {
         Assert.Equal(new Hole('J', 9), Hole.Parse("J9"));

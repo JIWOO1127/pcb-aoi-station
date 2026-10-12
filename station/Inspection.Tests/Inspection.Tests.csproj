@@ -16,6 +16,12 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Inspection.Contracts\Inspection.Contracts.csproj" />
+    <ProjectReference Include="..\Inspection.Station\Inspection.Station.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- MES 실제 응답 원문 (GET /api/recipes, GET /api/recipes/{id}). 토큰은 없다. -->
+    <None Update="Fixtures\**\*.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

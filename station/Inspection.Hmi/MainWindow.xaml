@@ -1,98 +1,383 @@
-﻿<Window x:Class="Inspection.Hmi.MainWindow"
+<!--
+  작업자 화면.
+
+  레이아웃 고정 원칙: 상태가 바뀌어도 요소의 위치와 크기는 그대로 두고
+  내용만 바꾼다. 하루 수백 번 보는 화면에서는 "어디에 무엇이 있다"는
+  위치 기억이 속도를 만들기 때문이다.
+  (사유 영역을 고정하지 않으면 카드 수에 따라 미니어처가 늘었다 줄었다 한다)
+-->
+<Window x:Class="Inspection.Hmi.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        Title="PCB AOI 검사 스테이션" Width="1366" Height="800"
+        xmlns:ctrl="clr-namespace:Inspection.Hmi.Controls"
+        Title="PCB AOI 검사 스테이션" Width="1560" Height="920"
         Background="#1E1E1E" Foreground="White" FontSize="16">
 
     <Window.InputBindings>
         <KeyBinding Key="Space" Command="{Binding InspectCommand}"/>
+        <KeyBinding Key="F" Command="{Binding RejectCommand}"/>
         <KeyBinding Key="O" Modifiers="Control" Command="{Binding OpenImageCommand}"/>
+        <KeyBinding Key="C" Modifiers="Control" Command="{Binding NextCameraCommand}"/>
     </Window.InputBindings>
 
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto"/>
-            <!-- 상태바 -->
-            <RowDefinition Height="*"/>
-            <!-- 본문 -->
-            <RowDefinition Height="Auto"/>
-            <!-- 조작바 -->
+            <RowDefinition Height="44"/>    <!-- 헤더 -->
+            <RowDefinition Height="*"/>     <!-- 본문 -->
+            <RowDefinition Height="88"/>    <!-- 조작바 -->
         </Grid.RowDefinitions>
 
-        <!-- 상태바 -->
-        <Border Grid.Row="0" Background="#2D2D2D" Padding="12,8">
+        <!-- 헤더 -->
+        <Border Grid.Row="0" Background="#2D2D2D" Padding="12,0">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Left" Text="{Binding SelectedProduct, StringFormat=제품: {0}}"/>
-                <TextBlock DockPanel.Dock="Left" Text="{Binding ImageDescription}"
-                           Margin="24,0,0,0" Foreground="#9E9E9E"/>
-                <TextBlock DockPanel.Dock="Right" Text="카메라 ● 추론 ● MES ● (연결 표시 예정)" Foreground="#9E9E9E"/>
+                <!--
+                  제품 선택 (Hmi:Products). 검사 중에는 잠근다.
+                  Focusable=False: 선택 후 포커스가 남아 Space(검사)·방향키가 드롭다운으로 가지 않게.
+                -->
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock Text="제품:" FontSize="17" FontWeight="Bold" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                    <ComboBox ItemsSource="{Binding Products}" SelectedItem="{Binding SelectedProduct}"
+                              IsEnabled="{Binding CanChangeProduct}" Focusable="False"
+                              MinWidth="120" FontSize="16" FontWeight="Bold" VerticalAlignment="Center"/>
+                </StackPanel>
+                <TextBlock DockPanel.Dock="Left" Text="{Binding InspectionStamp}"
+                           Margin="22,0,0,0" FontSize="17" Foreground="#E0E0E0" VerticalAlignment="Center"/>
+                <TextBlock DockPanel.Dock="Left" Text="{Binding LastResultNote}"
+                           Margin="22,0,0,0" FontSize="13" Foreground="#757575" VerticalAlignment="Center"/>
+
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- 로그인한 작업자 + 로그아웃 -->
+                    <TextBlock Text="{Binding WorkerText}" Foreground="#E0E0E0" FontSize="14"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Button Style="{StaticResource HmiButton}" Content="로그아웃"
+                            Command="{Binding LogoutCommand}"
+                            Visibility="{Binding IsLoggedIn, Converter={StaticResource BoolToVisibility}}"
+                            Width="70" Height="26" FontSize="12" Background="#3A3A3A" Foreground="#9E9E9E"
+                            Margin="0,0,22,0"/>
+                    <Ellipse Width="11" Height="11" Margin="0,0,5,0"
+                             Fill="{Binding CameraOk, Converter={StaticResource StatusToBrush}}"/>
+                    <TextBlock Text="카메라" Foreground="#9E9E9E" FontSize="13" Margin="0,0,14,0"/>
+                    <Ellipse Width="11" Height="11" Margin="0,0,5,0"
+                             Fill="{Binding InferenceOk, Converter={StaticResource StatusToBrush}}"/>
+                    <TextBlock Text="추론" Foreground="#9E9E9E" FontSize="13" Margin="0,0,14,0"/>
+                    <Ellipse Width="11" Height="11" Margin="0,0,5,0"
+                             Fill="{Binding MesOk, Converter={StaticResource StatusToBrush}}"/>
+                    <TextBlock Text="{Binding MesText}" Foreground="#9E9E9E" FontSize="13"/>
+                </StackPanel>
                 <TextBlock/>
             </DockPanel>
         </Border>
 
-        <!-- 본문 -->
+        <!--
+          본문 (v13): 왼쪽 정사각형 하나 + 오른쪽 판정/카드/목록.
+          검사 영역이 거의 정사각형이라, 카메라 화면·검사한 사진·보드 표시를 같은 정사각형 자리에 번갈아 띄운다.
+          (v12까지는 16:9 카메라 화면이 크고 미니어처가 구석에 따로 있어 빈 공간이 많았다)
+        -->
         <Grid Grid.Row="1" Margin="12">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="3*"/>
-                <ColumnDefinition Width="2*"/>
+                <ColumnDefinition Width="Auto"/>
+                <ColumnDefinition Width="*"/>
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="Black" BorderBrush="#424242" BorderThickness="1" Margin="0,0,12,0">
-                <TextBlock Text="카메라 영상 / 결과 이미지 영역" Foreground="#757575"
-                           HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- 왼쪽: 정사각형 패널. 폭 = 자기 높이 -->
+            <Border Grid.Column="0" Margin="0,0,12,0" Background="Black"
+                    BorderBrush="#424242" BorderThickness="1" ClipToBounds="True"
+                    Width="{Binding ActualHeight, RelativeSource={RelativeSource Self}}">
+                <Grid>
+                    <!-- ① 보드 표시 (PASS·FAIL): 실제 사진 위 표시가 있으면 사진, 없으면 미니어처 -->
+                    <ctrl:PhotoOverlay Margin="10"
+                        Visibility="{Binding ShowPhoto, Converter={StaticResource BoolToVisibility}}"/>
+                    <ctrl:BoardMiniature Margin="10"
+                        Visibility="{Binding ShowMiniature, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- 사진 / 배치도 전환, 모델이 본 것 (사진 정보가 있을 때만) -->
+                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10"
+                                Visibility="{Binding ShowViewToggle, Converter={StaticResource BoolToVisibility}}">
+                        <Button Style="{StaticResource HmiButton}" Content="모델이 본 것"
+                                Command="{Binding ToggleModelBoxesCommand}"
+                                Width="96" Height="30" FontSize="12" Background="#CC3A3A3A" Margin="0,0,6,0"/>
+                        <Button Style="{StaticResource HmiButton}" Content="{Binding ViewToggleText}"
+                                Command="{Binding ToggleViewCommand}"
+                                Width="96" Height="30" FontSize="12" Background="#CC3A3A3A"/>
+                    </StackPanel>
+
+                    <!-- ② 사진 (실시간 / 검사한 사진). 카메라일 때는 가이드 주변만 잘라서 온다 -->
+                    <Viewbox Stretch="Uniform"
+                             Visibility="{Binding ShowPanelImage, Converter={StaticResource BoolToVisibility}}">
+                        <Grid Width="{Binding PanelImage.PixelWidth}" Height="{Binding PanelImage.PixelHeight}">
+                            <Image Source="{Binding PanelImage}" Stretch="Fill"/>
+
+                            <!--
+                              맞춤 가이드: 잘라낸 영역 = 가이드 + 사방 5% 여백 이므로,
+                              가이드는 0.05 : 1 : 0.05 비율 칸의 가운데에 그리면 정확히 겹친다.
+                            -->
+                            <Grid Visibility="{Binding ShowGuideNow, Converter={StaticResource BoolToVisibility}}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="0.05*"/>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="0.05*"/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="0.05*"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="0.05*"/>
+                                </Grid.RowDefinitions>
+                                <Rectangle Grid.Row="1" Grid.Column="1" Stroke="#FFEB3B" StrokeThickness="3"
+                                           StrokeDashArray="6 4" Opacity="0.8"/>
+                            </Grid>
+                        </Grid>
+                    </Viewbox>
+
+                    <!-- ③ 이미지 없음 안내 -->
+                    <TextBlock Text="{Binding NoImageText}" Foreground="#9E9E9E" FontSize="20"
+                               TextWrapping="Wrap" TextAlignment="Center" Margin="40"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               Visibility="{Binding ShowNoImage, Converter={StaticResource BoolToVisibility}}"/>
+
+                    <!-- 지금 보고 있는 것 -->
+                    <Border Background="#B0000000" CornerRadius="3" Padding="8,3"
+                            HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="10">
+                        <TextBlock Text="{Binding PanelLabel}" FontSize="15" Foreground="White"/>
+                    </Border>
+
+                </Grid>
             </Border>
 
-            <DockPanel Grid.Column="1">
-                <Border DockPanel.Dock="Top" Height="140" CornerRadius="6"
-                        Background="{Binding Verdict, Converter={StaticResource VerdictToBrush}}">
-                    <TextBlock Text="{Binding Verdict, Converter={StaticResource VerdictToText}}"
-                               FontSize="64" FontWeight="Bold"
-                               HorizontalAlignment="Center" VerticalAlignment="Center"/>
+            <!-- 오른쪽: 판정 / 카드 / 목록 (높이 고정) -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="112"/>   <!-- 판정 -->
+                    <!--
+                      카드: 불량 수만큼만 차지한다 (최소 1장 높이, 최대 3장).
+                      v13에선 400 고정이라 1건일 때 빈 공간이 크고 목록이 눌렸다.
+                      보드 배치도는 왼쪽이라 카드 수가 바뀌어도 움직이지 않는다.
+                    -->
+                    <RowDefinition Height="Auto" MinHeight="146"/>
+                    <RowDefinition Height="*"/>     <!-- 목록 -->
+                </Grid.RowDefinitions>
+
+                <!-- 판정 배너 + 재검사 비교 -->
+                <Border Grid.Row="0" CornerRadius="6"
+                        Background="{Binding State, Converter={StaticResource StateToBrush}}">
+                    <Grid>
+                        <TextBlock Text="{Binding BannerText}" FontSize="48" FontWeight="Bold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        <TextBlock Text="{Binding BannerNote}" FontSize="15" Foreground="#FFE0E0"
+                                   HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="0,0,14,8"/>
+                    </Grid>
                 </Border>
 
-                <StackPanel DockPanel.Dock="Top" Margin="0,12" Orientation="Horizontal">
-                    <TextBlock Text="{Binding DefectCount, StringFormat=불량 {0}건}" Foreground="#BDBDBD" Margin="0,0,24,0"/>
-                    <TextBlock Text="{Binding LatencyMs, StringFormat=처리 {0} ms}" Foreground="#BDBDBD"/>
-                </StackPanel>
+                <!-- 불량 카드 또는 안내 한 줄 -->
+                <Grid Grid.Row="1" Margin="0,10,0,10" MaxHeight="400">
+                    <ItemsControl ItemsSource="{Binding DefectCards}" VerticalAlignment="Top">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="#33201F" BorderBrush="#D32F2F" BorderThickness="0,0,0,2"
+                                        Padding="10,7" Margin="0,0,0,8" Height="118">
+                                    <DockPanel>
+                                        <Border DockPanel.Dock="Left" Background="#E53935" CornerRadius="14"
+                                                BorderBrush="White" BorderThickness="1.5"
+                                                Width="28" Height="28" Margin="0,4,12,0" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding Badge}" Foreground="White"
+                                                       FontSize="15" FontWeight="Bold"
+                                                       HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                        </Border>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding Title}" Foreground="White"
+                                                       FontSize="28" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Detail}" Foreground="#FFCDD2"
+                                                       FontSize="18" Margin="0,1,0,0" TextTrimming="CharacterEllipsis"/>
+                                            <TextBlock Text="{Binding Action}" Foreground="#81D4FA"
+                                                       FontSize="18" Margin="0,4,0,0" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </DockPanel>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <ListView ItemsSource="{Binding Parts}" Background="#252526" Foreground="White" BorderThickness="0">
+                    <TextBlock Text="{Binding StatusMessage}"
+                               Visibility="{Binding StatusMessage, Converter={StaticResource EmptyToVisibility}}"
+                               FontSize="25" FontWeight="Bold" Foreground="White"
+                               TextWrapping="Wrap" VerticalAlignment="Top" Margin="4,4"/>
+                </Grid>
+
+                <!--
+                  목록 + 촬영 원본.
+                  촬영 원본을 보드 배치도 위 구석에 두면 부품(W6 등)을 가려서, 목록 오른쪽 빈 자리로 옮겼다.
+                -->
+                <Grid Grid.Row="2">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="1" Width="240" Margin="10,0,0,0" Background="Black"
+                        BorderBrush="#424242" BorderThickness="1"
+                        Visibility="{Binding ShowInset, Converter={StaticResource BoolToVisibility}}">
+                    <Grid>
+                        <Image Source="{Binding CapturedFull}" Stretch="Uniform"/>
+                        <Border Background="#B0000000" Padding="6,2"
+                                HorizontalAlignment="Left" VerticalAlignment="Top">
+                            <TextBlock Text="촬영 원본" FontSize="12" Foreground="White"/>
+                        </Border>
+                    </Grid>
+                </Border>
+
+                <!-- 부품 목록: 불량이 위로 정렬된다 -->
+                <ListView Grid.Column="0" ItemsSource="{Binding Parts}"
+                          SelectedItem="{Binding SelectedPart}"
+                          Background="#252526" Foreground="White" BorderThickness="0" FontSize="14"
+                          ScrollViewer.HorizontalScrollBarVisibility="Disabled">
                     <ListView.ItemContainerStyle>
                         <Style TargetType="ListViewItem">
-                            <Setter Property="Foreground" Value="White"/>
+                            <Setter Property="Foreground" Value="#8E8E8E"/>
+                            <Setter Property="Height" Value="30"/>
                             <Style.Triggers>
                                 <DataTrigger Binding="{Binding Verdict}" Value="Fail">
                                     <Setter Property="Foreground" Value="#FF6B6B"/>
                                     <Setter Property="FontWeight" Value="Bold"/>
+                                    <Setter Property="Background" Value="#3A1F1F"/>
                                 </DataTrigger>
                             </Style.Triggers>
                         </Style>
                     </ListView.ItemContainerStyle>
                     <ListView.View>
-                        <GridView>
-                            <GridViewColumn Header="부품" Width="60" DisplayMemberBinding="{Binding PartId}"/>
-                            <GridViewColumn Header="기대" Width="110" DisplayMemberBinding="{Binding ExpectedClass}"/>
-                            <GridViewColumn Header="탐지" Width="110"
-                                            DisplayMemberBinding="{Binding DetectedClass, TargetNullValue=-}"/>
-                            <GridViewColumn Header="덮인 홀" Width="120"
-                                            DisplayMemberBinding="{Binding CoveredHoles, Converter={StaticResource HoleList}}"/>
-                            <GridViewColumn Header="결과" Width="70"
+                        <GridView ColumnHeaderContainerStyle="{StaticResource HmiGridHeader}">
+                            <GridViewColumn Header="부품" Width="70" DisplayMemberBinding="{Binding PartId}"/>
+                            <GridViewColumn Header="있어야 할 것" Width="170"
+                                            DisplayMemberBinding="{Binding ExpectedClass, Converter={StaticResource ClassName}}"/>
+                            <GridViewColumn Header="탐지된 것" Width="170"
+                                            DisplayMemberBinding="{Binding DetectedClass, Converter={StaticResource ClassName}}"/>
+                            <GridViewColumn Header="판정" Width="90"
                                             DisplayMemberBinding="{Binding Defect, Converter={StaticResource DefectToText}}"/>
                         </GridView>
                     </ListView.View>
                 </ListView>
-            </DockPanel>
+                </Grid>
+            </Grid>
         </Grid>
 
-        <!-- 조작바 -->
-        <Border Grid.Row="2" Background="#2D2D2D" Padding="12">
+        <!-- 조작바: 버튼 위치 고정 -->
+        <Border Grid.Row="2" Background="#2D2D2D" Padding="12,0">
             <DockPanel>
-                <Button DockPanel.Dock="Left" Content="검사 (Space)" Command="{Binding InspectCommand}"
-                        Focusable="False" Width="200" Height="56" FontSize="20" FontWeight="Bold"/>
-                <Button DockPanel.Dock="Left" Content="사진 열기 (Ctrl+O)" Command="{Binding OpenImageCommand}"
-                        Focusable="False" Width="180" Height="56" FontSize="16" Margin="12,0,0,0"/>
-                <TextBlock Text="{Binding Message}" Margin="20,0,0,0" FontSize="18"
-                           VerticalAlignment="Center" TextWrapping="Wrap"/>
+                <!-- 주 동작: 상태에 따라 검사 / 수리 후 재검사 / 재검사 -->
+                <Button DockPanel.Dock="Left" Style="{StaticResource HmiButton}"
+                        Content="{Binding PrimaryButtonText}" Command="{Binding InspectCommand}"
+                        Width="300" Height="64" FontSize="22" Background="#1565C0"
+                        VerticalAlignment="Center"/>
+
+                <!-- 불량 확정: FAIL일 때만 보인다 -->
+                <Button DockPanel.Dock="Left" Style="{StaticResource HmiButton}"
+                        Content="불량 확정 (F)" Command="{Binding RejectCommand}"
+                        Visibility="{Binding ShowRejectButton, Converter={StaticResource BoolToVisibility}}"
+                        Width="200" Height="64" FontSize="20" Background="#C62828"
+                        Margin="12,0,0,0" VerticalAlignment="Center"/>
+
+                <!-- 입력 선택 (관리자용이라 작게) -->
+                <Button DockPanel.Dock="Right" Style="{StaticResource HmiButton}"
+                        Content="사진 열기" Command="{Binding OpenImageCommand}"
+                        Width="96" Height="34" FontSize="12" Background="#3A3A3A"
+                        Foreground="#9E9E9E" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <Button DockPanel.Dock="Right" Style="{StaticResource HmiButton}"
+                        Content="카메라 사용" Command="{Binding UseCameraCommand}"
+                        Visibility="{Binding IsCameraMode, Converter={StaticResource BoolToVisibility}, ConverterParameter=invert}"
+                        Width="96" Height="34" FontSize="12" Background="#3A3A3A"
+                        Foreground="#9E9E9E" VerticalAlignment="Center" Margin="8,0,0,0"/>
+                <Button DockPanel.Dock="Right" Style="{StaticResource HmiButton}"
+                        Content="카메라 전환" Command="{Binding NextCameraCommand}"
+                        Width="96" Height="34" FontSize="12" Background="#3A3A3A"
+                        Foreground="#9E9E9E" VerticalAlignment="Center" Margin="8,0,0,0"/>
+
+                <StackPanel DockPanel.Dock="Right" Margin="0,0,18,0" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding LatencyMs, StringFormat=처리 {0} ms}"
+                               Foreground="#757575" FontSize="12" HorizontalAlignment="Right"/>
+                    <TextBlock Text="{Binding ImageDescription}"
+                               Foreground="#5A5A5A" FontSize="11" HorizontalAlignment="Right"/>
+                </StackPanel>
+                <TextBlock/>
             </DockPanel>
         </Border>
+
+        <!--
+          로그인 직후 레시피 배너: 헤더 바로 아래에 5초 떠 있다가 사라진다.
+          본문 위에 겹쳐 그려 레이아웃을 밀지 않고(위치 고정 원칙), 클릭을 받지 않아 검사를 막지 않는다.
+          파란색 = MES에서 새 승인 레시피 적용, 노란색 = MES 연결 안 됨(마지막으로 받은 레시피로 검사).
+        -->
+        <Border Grid.Row="1" VerticalAlignment="Top" Margin="12,6,12,0" Padding="16,10" CornerRadius="6"
+                IsHitTestVisible="False"
+                Visibility="{Binding ShowRecipeBanner, Converter={StaticResource BoolToVisibility}}">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Background" Value="#1565C0"/>
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding RecipeBannerKind}" Value="Offline">
+                            <Setter Property="Background" Value="#F9A825"/>
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <StackPanel>
+                <TextBlock Text="{Binding RecipeBannerTitle}" FontSize="18" FontWeight="Bold">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Setter Property="Foreground" Value="White"/>
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RecipeBannerKind}" Value="Offline">
+                                    <Setter Property="Foreground" Value="#212121"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+                <TextBlock Text="{Binding RecipeBannerDetail}" FontSize="13" Foreground="#E3F2FD" Margin="0,3,0,0">
+                    <TextBlock.Style>
+                        <Style TargetType="TextBlock">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding RecipeBannerDetail}" Value="">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBlock.Style>
+                </TextBlock>
+            </StackPanel>
+        </Border>
+
+        <!--
+          로그인 화면: 본문과 조작바를 덮는다. 로그인하면 사라진다 (Hmi:RequireLogin=false면 처음부터 안 보임).
+          PIN은 보안상 바인딩하지 않고 PasswordBox를 그대로 명령에 넘긴다.
+        -->
+        <Grid Grid.Row="1" Grid.RowSpan="2" Background="#E61E1E1E" FocusManager.FocusedElement="{Binding ElementName=EmployeeIdBox}"
+              Visibility="{Binding ShowLoginOverlay, Converter={StaticResource BoolToVisibility}}">
+            <Border Width="420" Background="#2D2D2D" CornerRadius="8" Padding="32,28"
+                    HorizontalAlignment="Center" VerticalAlignment="Center">
+                <StackPanel>
+                    <TextBlock Text="작업자 로그인" FontSize="28" FontWeight="Bold" Margin="0,0,0,20"/>
+
+                    <TextBlock Text="사번" Foreground="#9E9E9E" FontSize="14"/>
+                    <TextBox x:Name="EmployeeIdBox" Text="{Binding LoginEmployeeId, UpdateSourceTrigger=PropertyChanged}"
+                             FontSize="22" Height="44" Padding="8,4" Margin="0,4,0,14"
+                             Background="#1E1E1E" Foreground="White" BorderBrush="#555" CaretBrush="White"/>
+
+                    <TextBlock Text="PIN" Foreground="#9E9E9E" FontSize="14"/>
+                    <PasswordBox x:Name="PinBox" FontSize="22" Height="44" Padding="8,4" Margin="0,4,0,18"
+                                 Background="#1E1E1E" Foreground="White" BorderBrush="#555" CaretBrush="White">
+                        <PasswordBox.InputBindings>
+                            <KeyBinding Key="Enter" Command="{Binding LoginCommand}"
+                                        CommandParameter="{Binding ElementName=PinBox}"/>
+                        </PasswordBox.InputBindings>
+                    </PasswordBox>
+
+                    <Button Style="{StaticResource HmiButton}" Content="로그인 (Enter)"
+                            Command="{Binding LoginCommand}" CommandParameter="{Binding ElementName=PinBox}"
+                            Height="52" FontSize="20" Background="#1565C0"/>
+
+                    <TextBlock Text="{Binding LoginMessage}" Foreground="#FFB74D" FontSize="14"
+                               TextWrapping="Wrap" Margin="0,14,0,0"
+                               Visibility="{Binding LoginMessage, Converter={StaticResource EmptyToVisibility}}"/>
+                </StackPanel>
+            </Border>
+        </Grid>
     </Grid>
 </Window>
